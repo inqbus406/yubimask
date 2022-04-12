@@ -1,6 +1,6 @@
 # YubiMask
 
-A repository for our CSE 481S Security Capstone project called YubiMask.
+A repository for our CSE 481S Security Capstone project called YubiMask. Group members include Cooper Chia, Jess Olmstead, James Chen, and Conner Wallace.
 
 ## Getting started
 
