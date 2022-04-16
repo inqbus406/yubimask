@@ -1,3 +1,5 @@
+mod ethereum;
+
 fn main() {
-    println!("Hello, world!");
+    println!("Welcome to YubiMask!");
 }
