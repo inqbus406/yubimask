@@ -5,8 +5,18 @@ use yubico_manager::config::{Config, Mode, Slot};
 mod ethereum;
 
 fn main() {
+    MainWindow::new().run();
     println!("Welcome to YubiMask!");
     get_yk_response();
+}
+
+slint::slint! {
+    MainWindow := Window {
+        Text {
+            text: "Welcome to YubiMask!";
+            color: green;
+        }
+    }
 }
 
 fn get_yk_response() {
