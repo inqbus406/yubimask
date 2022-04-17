@@ -1,13 +1,32 @@
-use std::ops::Deref;
-use yubico_manager::Yubico;
-use yubico_manager::config::{Config, Mode, Slot};
+use std::env;
+use anyhow::Result;
 
-mod ethereum;
+mod wallet;
 
-fn main() {
-    MainWindow::new().run();
+fn main() -> Result<()> {
     println!("Welcome to YubiMask!");
-    get_yk_response();
+    let args: Vec<String> = env::args().skip(1).collect();
+    if args.contains(&String::from("-v")) {
+        MainWindow::new().run();
+    }
+    if args.contains(&String::from("--new")) {
+        let (sec_key, pub_key) = wallet::ethereum::gen_keypair();
+        println!("Secret key: {}", sec_key.to_string());
+        println!("Public key: {}", pub_key.to_string());
+        let addr = wallet::ethereum::address_from_pubkey(&pub_key);
+        println!("Wallet address: {:?}", addr);
+        let wallet = wallet::Wallet::new(&sec_key, &pub_key, &addr);
+        println!("{:?}", &wallet);
+        wallet.write_to_file("test_wallet.ym")?;
+    } else {
+        let wallet = match wallet::Wallet::read_from_file(&"test_wallet.ym") {
+            Ok(w) => w,
+            Err(_) => panic!("File not found!")
+        };
+        println!("Read from file: {:?}", &wallet);
+    }
+
+    Ok(())
 }
 
 slint::slint! {
@@ -16,32 +35,5 @@ slint::slint! {
             text: "Welcome to YubiMask!";
             color: green;
         }
-    }
-}
-
-fn get_yk_response() {
-    let mut yubi = Yubico::new();
-    if let Ok(device) = yubi.find_yubikey() {
-        println!("Vendor ID: {:?}", device.vendor_id);
-        println!("Product ID: {:?}", device.product_id);
-
-        let config = Config::default()
-            .set_vendor_id(device.vendor_id)
-            .set_product_id(device.product_id)
-            .set_variable_size(true)
-            .set_mode(Mode::Sha1)
-            .set_slot(Slot::Slot2);
-
-        let challenge = String::from("mychallenge");
-        let hmac_result = yubi.challenge_response_hmac(challenge.as_bytes(), config)
-            .unwrap();
-
-        let hexval = hmac_result.deref();
-        println!("{:?}", hmac_result);
-        let hexstring = hex::encode(hexval);
-        println!("Response: {}", hexstring);
-
-    } else {
-        println!("Yubikey not found.");
     }
 }
