@@ -14,6 +14,10 @@ pub fn gen_keypair() -> (SecretKey, PublicKey) {
     let secp = secp256k1::Secp256k1::new();
     let mut rng;
     let num;
+    // let rand = match OsRng::new() {
+    //     Ok(mut r) => r.next_u64(),
+    //     Err(_) => EntropyRng::new().next_u64()
+    // };
     if let Ok(mut rand) = OsRng::new() {
         num = rand.next_u64();
         println!("Random number: {}", num);
