@@ -23,11 +23,12 @@ fn main() -> Result<()> {
         println!("{:?}", &wallet);
         wallet.write_to_file()?;
     } else {
-        let wallet = match wallet::Wallet::read_from_file("test_wallet.ym") {
+        let mut wallet = match wallet::Wallet::read_from_file("test_wallet2.ym") {
             Ok(w) => w,
-            Err(_) => panic!("File not found!")
+            Err(e) => panic!("File not found! {}", e)
         };
         println!("Read from file: {:?}", &wallet);
+        println!("Decrypted secret key: {:?}", &mut wallet.get_sec_key().unwrap())
     }
     //wallet::Wallet::encrypt_decrypt("test_message_string");
 
