@@ -1,25 +1,29 @@
-// A treat to make things work with multiple networks.
+// A generic wallet to make things work with multiple networks.
 // We'll use this more in the future.
 
 pub mod ethereum;
 
 use std::fs::OpenOptions;
-use std::io::{BufReader, BufWriter};
+use std::io;
+use std::io::{BufReader, BufWriter, Write};
 use std::str::FromStr;
 use anyhow::Result;
 use secp256k1::{PublicKey, SecretKey};
 use serde::{Serialize, Deserialize};
 use web3::types::Address;
 use yubico_manager::Yubico;
-use yubico_manager::config::{Config, Mode, Slot};
+use yubico_manager::config::{Command, Config, Mode, Slot};
 use std::ops::Deref;
 
 // For encryption
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use aes_gcm::aead::{Aead, NewAead};
 use argon2::Argon2;
-use rand::RngCore;
-use rand::rngs::{OsRng, EntropyRng}; // May want to use EntropyRing as a fallback
+use rand::{Rng, RngCore, thread_rng};
+use rand::distributions::Alphanumeric;
+use rand::rngs::{OsRng, EntropyRng};
+use yubico_manager::configure::DeviceModeConfig;
+use yubico_manager::hmacmode::HmacKey; // May want to use EntropyRing as a fallback
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Wallet {
@@ -33,11 +37,16 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(name: &str, sec_key: &SecretKey, pub_key: &PublicKey, addr: &Address) -> Self {
+    pub fn new(name: &str, sec_key: &SecretKey, pub_key: &PublicKey, addr: &Address, debug: bool) -> Self {
         // this will panic if encrypt fails
         let mut nonce = [0u8; 12];
         let sec_key = sec_key.as_ref();
-        let ciphertext = encrypt(sec_key, &mut nonce).unwrap();
+        std::io::stdout().flush();
+        let password = match rpassword::prompt_password("Set new wallet password: ") {
+            Ok(p) => p,
+            Err(_) => panic!("Password is required for wallet creation") // Should probably make this more graceful, re-prompt, etc
+        };
+        let ciphertext = encrypt(&password, sec_key, &mut nonce, debug).unwrap();
         Self { // Could also say "EthWallet" instead
             name: String::from(name),
             sec_key: ciphertext,
@@ -48,9 +57,13 @@ impl Wallet {
     }
 
     pub fn write_to_file(&self) -> Result<()> {
-        let file = OpenOptions::new().write(true).create(true).open(&self.name)?;
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&self.name)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, self)?;
+        serde_json::to_writer(writer, self)?;
 
         Ok(())
     }
@@ -64,10 +77,14 @@ impl Wallet {
 
     // Every time the secret key is retrieved here, it must be decrypted and then re-encrypted with new
     // salt, nonce, etc
-    pub fn get_sec_key(&mut self) -> Result<SecretKey> {
-        let plaintext = decrypt(&self.sec_key, &self.nonce)?;
+    pub fn get_sec_key(&mut self, debug: bool) -> Result<SecretKey> {
+        std::io::stdout().flush();
+        let password = rpassword::prompt_password("Wallet password: ")?;
+
+        let plaintext = decrypt(&password, &self.sec_key, &self.nonce, debug)?;
         let sec_key = SecretKey::from_slice(&plaintext)?;
-        self.sec_key = encrypt(&plaintext, &mut self.nonce)?;
+        self.sec_key = encrypt(&password, &plaintext, &mut self.nonce, debug)?;
+        self.write_to_file();
         Ok(sec_key)
     }
 
@@ -91,14 +108,16 @@ impl Wallet {
     }
 }
 
-fn encrypt(message: &[u8], nonce: &mut [u8]) -> Result<Vec<u8>> {
+fn encrypt(password: &str, message: &[u8], nonce: &mut [u8], debug: bool) -> Result<Vec<u8>> {
     let mut key: [u8; 32] = [0u8; 32];
 
     let mut rand = OsRng::new()?;
     rand.fill_bytes(nonce);
 
-    let password = "dummy password";
-    let mut composite = get_yk_response(nonce)?;
+    let mut composite = match debug {
+        false => get_yk_response(nonce)?,
+        true => Vec::new()
+    };
     composite.extend(password.as_bytes());
     let kdf = Argon2::default(); // set these params manually later!
     kdf.hash_password_into(&composite, nonce, &mut key);
@@ -115,11 +134,13 @@ fn encrypt(message: &[u8], nonce: &mut [u8]) -> Result<Vec<u8>> {
     }
 }
 
-fn decrypt(ciphertext: &[u8], nonce: &[u8]) -> Result<Vec<u8>> {
+fn decrypt(password: &str, ciphertext: &[u8], nonce: &[u8], debug: bool) -> Result<Vec<u8>> {
     let mut key: [u8; 32] = [0u8; 32];
 
-    let password = "dummy password";
-    let mut composite = get_yk_response(nonce)?;
+    let mut composite = match debug {
+        false => get_yk_response(nonce)?,
+        true => Vec::new()
+    };
     composite.extend(password.as_bytes());
     let kdf = Argon2::default();
     kdf.hash_password_into(&composite, nonce, &mut key);
@@ -162,4 +183,48 @@ fn get_yk_response(challenge: &[u8]) -> Result<Vec<u8>> {
     } else {
         panic!("Yubikey not found.");
     }
+}
+
+// A function to program any number of yubikeys alike for a new wallet.
+pub fn program_keys() -> Result<()> {
+    let mut yubi = Yubico::new();
+    let mut cont = String::from('y');
+    let mut count = 0;
+
+    let mut rng = thread_rng();
+    let secret: String = rng.sample_iter(&Alphanumeric).take(20).collect();
+    let hmac_key: HmacKey = HmacKey::from_slice(secret.as_bytes());
+
+    while cont.to_lowercase().contains('y') {
+        count += 1;
+        println!("Configuring key #{}", count);
+
+        if let Ok(device) = yubi.find_yubikey() {
+            println!("Vendor ID: {:?}", device.vendor_id);
+            println!("Product ID: {:?}", device.product_id);
+
+            let config = Config::default()
+                .set_vendor_id(device.vendor_id)
+                .set_product_id(device.product_id)
+                .set_command(Command::Configuration2);
+
+            let mut device_config = DeviceModeConfig::default();
+            // First bool is for variable length challenges, second is requiring a button press
+            device_config.challenge_response_hmac(&hmac_key, true, true);
+
+            if let Err(e) = yubi.write_config(config, &mut device_config) {
+                println!("{:?}", e);
+            } else {
+                println!("Successfully programmed!")
+            }
+            print!("Program another? (y/n) ");
+            io::stdin().read_line(&mut cont);
+
+        } else {
+            println!("Yubikey not found.")
+        }
+    }
+
+    println!("Done programming!");
+    Ok(())
 }
