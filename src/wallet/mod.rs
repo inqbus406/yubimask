@@ -237,7 +237,8 @@ pub fn program_keys() -> Result<()> {
             io::stdin().read_line(&mut cont);
 
         } else {
-            println!("Yubikey not found.")
+            println!("Yubikey not found.");
+            return Ok(());
         }
     }
 
