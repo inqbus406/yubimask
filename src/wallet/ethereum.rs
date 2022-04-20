@@ -3,6 +3,7 @@
 // networks if we add more.
 // A substantial portion of this code is taken from https://tms-dev-blog.com/build-a-crypto-wallet-using-rust/
 
+use std::io::Write;
 use std::str::FromStr;
 use secp256k1::{PublicKey, SecretKey};
 use secp256k1::rand::{rngs, SeedableRng};
@@ -13,6 +14,7 @@ use web3::{transports, Web3};
 use web3::transports::WebSocket;
 use web3::types::{Address, H256, TransactionParameters, U256};
 use anyhow::Result;
+use crate::wallet;
 use crate::wallet::Wallet;
 
 // For connecting to the ETH network
@@ -79,6 +81,39 @@ pub async fn sign_and_send(conn: &Web3<WebSocket>, txn: TransactionParameters, s
     let txn = conn.accounts().sign_transaction(txn, sec_key).await?;
     let result = conn.eth().send_raw_transaction(txn.raw_transaction).await?;
     Ok(result)
+}
+
+pub async fn send(conn: &Web3<WebSocket>, sec_key: &SecretKey) -> Result<()> {
+    println!("Sending ETH...");
+    let mut input = String::new();
+    print!("What address would you like to send to? ");
+    std::io::stdout().flush();
+    std::io::stdin().read_line(&mut input);
+    let to_addr = Address::from_str(&input)?;
+
+    input.clear();
+    print!("What amount would you like to send? ");
+    std::io::stdout().flush();
+    std::io::stdin().read_line(&mut input);
+    let mut amount = input.trim().parse();
+    while let Err(_) = amount {
+        print!("Could not parse, try again: ");
+        std::io::stdout().flush();
+        input.clear();
+        std::io::stdin().read_line(&mut input);
+        amount = f64::from_str(&input.trim()); // just doing it different ways for funsies
+    }
+    let amount = amount.unwrap();
+    println!("Sending {} ETH", amount);
+
+    //let to_addr = Address::from_str("0x5841eb5ccb285C262AD4d9A4144f63B5358DB54e")?;
+    //let amount = 0.001;
+    let txn = wallet::ethereum::create_txn(to_addr, amount);
+
+    let txn_hash = wallet::ethereum::sign_and_send(&conn, txn, &sec_key).await?;
+    println!("Transaction hash: {:?}", txn_hash);
+
+    Ok(())
 }
 
 pub fn wei_to_eth(wei: U256) -> f64 {

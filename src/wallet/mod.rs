@@ -46,6 +46,12 @@ impl Wallet {
             Ok(p) => p,
             Err(_) => panic!("Password is required for wallet creation") // Should probably make this more graceful, re-prompt, etc
         };
+        match rpassword::prompt_password("Re-enter password: ") {
+            Ok(password2) => if password2 != password {
+                panic!("Passwords don't match!");
+            },
+            Err(_) => panic!("Password must be entered twice!")
+        }
         let ciphertext = encrypt(&password, sec_key, &mut nonce, debug).unwrap();
         Self { // Could also say "EthWallet" instead
             name: String::from(name),
@@ -78,8 +84,9 @@ impl Wallet {
     // Every time the secret key is retrieved here, it must be decrypted and then re-encrypted with new
     // salt, nonce, etc
     pub fn get_sec_key(&mut self, debug: bool) -> Result<SecretKey> {
-        std::io::stdout().flush();
+        //println!("Trying to retrieve secret key");
         let password = rpassword::prompt_password("Wallet password: ")?;
+        std::io::stdout().flush();
 
         let plaintext = decrypt(&password, &self.sec_key, &self.nonce, debug)?;
         let sec_key = SecretKey::from_slice(&plaintext)?;
@@ -156,7 +163,7 @@ fn decrypt(password: &str, ciphertext: &[u8], nonce: &[u8], debug: bool) -> Resu
     }
 }
 
-fn get_yk_response(challenge: &[u8]) -> Result<Vec<u8>> {
+pub fn get_yk_response(challenge: &[u8]) -> Result<Vec<u8>> {
     let mut yubi = Yubico::new();
     if let Ok(device) = yubi.find_yubikey() {
         println!("Vendor ID: {:?}", device.vendor_id);
@@ -203,6 +210,15 @@ pub fn program_keys() -> Result<()> {
             println!("Vendor ID: {:?}", device.vendor_id);
             println!("Product ID: {:?}", device.product_id);
 
+            // Let's make sure this key isn't already programmed...
+            if is_programmed() {
+                print!("This key is already programmed, are you sure you want to overwrite? (y/n) ");
+                io::stdin().read_line(&mut cont);
+                if !cont.to_lowercase().contains('y') {
+                    continue
+                }
+            }
+
             let config = Config::default()
                 .set_vendor_id(device.vendor_id)
                 .set_product_id(device.product_id)
@@ -227,4 +243,26 @@ pub fn program_keys() -> Result<()> {
 
     println!("Done programming!");
     Ok(())
+}
+
+pub fn is_programmed() -> bool {
+    let mut yubi = Yubico::new();
+
+    if let Ok(device) = yubi.find_yubikey() {
+        let config = Config::default()
+            .set_vendor_id(device.vendor_id)
+            .set_product_id(device.product_id)
+            .set_variable_size(false)
+            .set_mode(Mode::Sha1)
+            .set_slot(Slot::Slot2);
+
+        println!("Please touch your Yubikey...");
+        if let Ok(_) = yubi.challenge_response_hmac(&[0], config) {
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    }
 }

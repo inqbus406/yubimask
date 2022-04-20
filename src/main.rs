@@ -5,10 +5,13 @@ use std::io::Write;
 use std::str::FromStr;
 use anyhow::Result;
 use clap::Parser;
+use crate::wallet::{get_yk_response, Wallet}; // only for testing
 use secp256k1::{key, SecretKey};
+use web3::transports::WebSocket;
 
 // For ethereum
 use web3::types::Address;
+use web3::Web3;
 
 mod wallet;
 
@@ -16,6 +19,12 @@ mod wallet;
 async fn main() -> Result<()> {
     println!("Welcome to YubiMask!");
     let args = Args::parse();
+
+    // For testing if yubikey chal/resp works on Windows
+    // println!("{}", wallet::is_programmed());
+    // let chal = b"test chal";
+    // println!("{:?}", get_yk_response(chal)?);
+    // return Ok(());
 
     // This is ihow I was doing it before I started using clap for parsing
     // let args: Vec<String> = env::args().skip(1).collect();
@@ -32,12 +41,14 @@ async fn main() -> Result<()> {
         // std::io::stdin().read_line(&mut fname);
         let fname = args.name.clone();
 
-        let mut response = String::new();
-        print!("Would you like to program your keys alike? This only needs to be done once. (y/n) ");
-        std::io::stdout().flush();
-        std::io::stdin().read_line(&mut response);
-        if response.to_lowercase().contains('y') {
-            wallet::program_keys();
+        if !args.debug {
+            let mut response = String::new();
+            print!("Would you like to program your keys alike? This only needs to be done once. (y/n) ");
+            std::io::stdout().flush();
+            std::io::stdin().read_line(&mut response);
+            if response.to_lowercase().contains('y') {
+                wallet::program_keys();
+            }
         }
 
         let (sec_key, pub_key) = wallet::ethereum::gen_keypair();
@@ -55,28 +66,30 @@ async fn main() -> Result<()> {
             Ok(w) => w,
             Err(e) => panic!("File not found! {}", e)
         };
-        println!("Read from file: {:?}", &wallet);
-        let sec_key = wallet.get_sec_key(args.debug)?;
-        println!("Decrypted secret key: {:?}", sec_key);
+        //println!("Read from file: {:?}", &wallet);
 
         // Connect to the network
         let conn = wallet::ethereum::connect().await?;
 
         // Print out the current block number
         let block = conn.eth().block_number().await?;
-        println!("block number: {}", &block);
+        println!("Block number: {}", &block);
+
+        let addr = wallet::ethereum::address_from_pubkey(&wallet.get_pub_key()?);
+        println!("Wallet address: {:?}", addr);
 
         // Print out the wallet balance
         let balance = wallet::ethereum::get_balance_eth(&wallet, &conn).await?;
         println!("Wallet balance: {} ETH", &balance);
 
         if args.send {
-            let to_addr = Address::from_str("0x5841eb5ccb285C262AD4d9A4144f63B5358DB54e")?;
-            let amount = 0.001;
-            let txn = wallet::ethereum::create_txn(to_addr, amount);
-
-            let txn_hash = wallet::ethereum::sign_and_send(&conn, txn, &sec_key).await?;
-            println!("Transaction hash: {:?}", txn_hash);
+            println!("Sending!");
+            if let Ok(sec_key) = wallet.get_sec_key(args.debug) {
+                //println!("Decrypted secret key: {:?}", sec_key);
+                wallet::ethereum::send(&conn, &sec_key).await?;
+            } else {
+                println!("Failed to decrypt secret key.");
+            }
         }
     }
     //wallet::Wallet::encrypt_decrypt("test_message_string");
