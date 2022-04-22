@@ -56,15 +56,7 @@ async fn main() -> Result<()> {
             }
         }
 
-        let (sec_key, pub_key) = wallet::ethereum::gen_keypair();
-        println!("Secret key: {}", sec_key.to_string());
-        println!("Public key: {}", pub_key.to_string());
-
-        let addr = wallet::ethereum::address_from_pubkey(&pub_key);
-        println!("Wallet address: {:?}", addr);
-
-        let wallet = wallet::Wallet::new(&fname, &sec_key, &pub_key, &addr, args.debug);
-        println!("{:?}", &wallet);
+        let wallet = wallet::Wallet::new(&fname, args.debug);
         wallet.write_to_file()?;
     } else {
         let mut wallet = match wallet::Wallet::read_from_file(&args.name) {
@@ -80,10 +72,6 @@ async fn main() -> Result<()> {
         let block = conn.eth().block_number().await?;
         println!("Block number: {}", &block);
 
-        if args.send {
-            send(&mut wallet, &conn, args.debug);
-        }
-
         loop {
             println!("What would you like to do?");
             println!("  1) view balance");
@@ -96,10 +84,10 @@ async fn main() -> Result<()> {
             std::io::stdout().flush();
             std::io::stdin().read_line(&mut response);
             match response.trim().deref() {
-                "1" => { print_balances(&wallet, &conn).await; },
-                "2" => { send(&mut wallet, &conn, args.debug).await; },
-                "3" => { receive(&wallet); },
-                "4" => { break; } ,
+                "1" => { wallet.print_balances(&conn).await?; },
+                "2" => { wallet.send(&conn).await?; },
+                "3" => { wallet.receive(); },
+                "4" => { break; },
                 _ => {}
             };
         }
@@ -107,31 +95,6 @@ async fn main() -> Result<()> {
     //wallet::Wallet::encrypt_decrypt("test_message_string");
 
     Ok(())
-}
-
-async fn print_balances(wallet: &Wallet, conn: &Web3<WebSocket>) -> Result<()> {
-    // Print out the wallet balance
-    let balance = wallet::ethereum::get_balance_eth(&wallet, &conn).await?;
-    println!("Wallet balance: {} ETH", &balance);
-
-    Ok(())
-}
-
-fn receive(wallet: &Wallet) -> Result<()> {
-    let addr = wallet::ethereum::address_from_pubkey(&wallet.get_pub_key()?);
-    println!("Wallet address: {:?}", addr);
-    Ok(())
-}
-
-async fn send(wallet: &mut Wallet, conn: &Web3<WebSocket>, debug: bool) -> Result<()> {
-    println!("Sending!");
-    if let Ok(sec_key) = wallet.get_sec_key(debug) {
-        //println!("Decrypted secret key: {:?}", sec_key);
-        wallet::ethereum::send(&conn, &sec_key).await
-    } else {
-        //println!("Failed to decrypt secret key.");
-        bail!("Failed to decrypt secret key.")
-    }
 }
 
 /// A secure cryptocurrency wallet leveraging encryption with hardware second factors.
@@ -150,7 +113,7 @@ struct Args {
     #[clap(short, long)]
     vis: bool,
 
-    /// Send
+    /// Send (deprecated)
     #[clap(short, long)]
     send: bool,
 

@@ -3,11 +3,12 @@
 
 pub mod ethereum;
 
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::{BufReader, BufWriter, Write};
 use std::str::FromStr;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use secp256k1::{PublicKey, SecretKey};
 use serde::{Serialize, Deserialize};
 use web3::types::Address;
@@ -22,25 +23,45 @@ use argon2::Argon2;
 use rand::{Rng, RngCore, thread_rng};
 use rand::distributions::Alphanumeric;
 use rand::rngs::{OsRng, EntropyRng};
+use web3::transports::WebSocket;
+use web3::Web3;
 use yubico_manager::configure::DeviceModeConfig;
-use yubico_manager::hmacmode::HmacKey; // May want to use EntropyRing as a fallback
+use yubico_manager::hmacmode::HmacKey;
 
+// HD wallet stuff
+//use bip39::{Language, Mnemonic, MnemonicType};
+use bip32::{Mnemonic, Language};
+
+// The networks we support
+const NETWORKS: [&str; 2] = ["ETH", "BTC"];
+
+// TODO probably should store the language of the wallet
 #[derive(Serialize, Deserialize, Debug)]
+struct FileData {
+    ciphertext: Vec<u8>, // encrypted seed phrase/mnemonic entropy
+    nonce: Vec<u8>, // unique number used to encrypt this data
+    debug: bool
+}
+
 pub struct Wallet {
     pub name: String, // wallet/file name
-    sec_key: Vec<u8>, // encrypted secret key
-    pub pub_key: String,
-    // Honestly later we will probably want to either get rid of this, or store addresses for all networks,
-    // because they will be different for different networks.
-    pub addr: String,
-    nonce: Vec<u8>
+    mnemonic: Mnemonic,
+    pub addrs: HashMap<String, String>,
+    filedata: FileData
 }
 
 impl Wallet {
-    pub fn new(name: &str, sec_key: &SecretKey, pub_key: &PublicKey, addr: &Address, debug: bool) -> Self {
+    pub fn new(name: &str, debug: bool) -> Self {
         // this will panic if encrypt fails
+        //let mnemonic = Mnemonic::new(MnemonicType::Words24, Language::English); // this was using bip39 crate
+
+        let mnemonic = Mnemonic::random(&mut rand_core::OsRng, Default::default());
+        let phrase = mnemonic.phrase();
+        let entropy = mnemonic.entropy();
+        println!("Generating new wallet from entropy: {:?}", entropy);
+        println!("Seed phrase: {}", phrase);
+
         let mut nonce = [0u8; 12];
-        let sec_key = sec_key.as_ref();
         std::io::stdout().flush();
         let password = match rpassword::prompt_password("Set new wallet password: ") {
             Ok(p) => p,
@@ -52,13 +73,35 @@ impl Wallet {
             },
             Err(_) => panic!("Password must be entered twice!")
         }
-        let ciphertext = encrypt(&password, sec_key, &mut nonce, debug).unwrap();
+
+        // println!("Mnemonic bytes: {}", mnemonic.entropy().len());
+        // let test: [u8; 32] = Vec::from(mnemonic.entropy().as_slice()).try_into().unwrap();
+        // println!("Test value is: {:?}", test);
+        // let test = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
+        // println!("Test value is: {:?}", test);
+
+        // FIXME this will panic if it's the wrong size, do it better!
+        let ciphertext = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
+
+        // Compute our public addresses
+        let mut addrs = HashMap::new();
+        for s in NETWORKS {
+            // For now, let's lazy-load the addresses. Might want to add them all here in the future, though
+            // This will also allow us to convert to a Vec<String> later for HD wallets
+            addrs.insert(String::from(s), String::new());
+        }
+
+        let filedata = FileData {
+            ciphertext,
+            nonce: Vec::from(nonce),
+            debug
+        };
+
         Self { // Could also say "EthWallet" instead
             name: String::from(name),
-            sec_key: ciphertext,
-            pub_key: pub_key.to_string(),
-            nonce: Vec::from(nonce),
-            addr: format!("{:?}", addr) // if we just use to_string() it gets truncated
+            mnemonic,
+            filedata,
+            addrs // For each one, use this macro format!("{:?}", addr) // if we just use to_string() it gets truncated
         }
     }
 
@@ -69,7 +112,7 @@ impl Wallet {
             .truncate(true)
             .open(&self.name)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer(writer, self)?;
+        serde_json::to_writer(writer, &self.filedata)?;
 
         Ok(())
     }
@@ -78,41 +121,74 @@ impl Wallet {
         println!("Reading from file: {}", path);
         let file = OpenOptions::new().read(true).open(path)?;
         let reader = BufReader::new(file);
-        Ok(serde_json::from_reader(reader)?)
+        let filedata: FileData = serde_json::from_reader(reader)?;
+
+        let entropy: [u8; 32] = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?
+            .try_into().unwrap();
+        let mnemonic = Mnemonic::from_entropy(entropy, Default::default());
+
+        let wallet = Wallet {
+            name: String::from(path),
+            addrs: HashMap::new(),
+            filedata,
+            mnemonic
+        };
+        Ok(wallet)
     }
 
     // Every time the secret key is retrieved here, it must be decrypted and then re-encrypted with new
     // salt, nonce, etc
-    pub fn get_sec_key(&mut self, debug: bool) -> Result<SecretKey> {
+    pub fn get_mnemonic(&mut self) -> Result<Mnemonic> {
         //println!("Trying to retrieve secret key");
-        let password = rpassword::prompt_password("Wallet password: ")?;
-        std::io::stdout().flush();
+        let password = get_password()?;
 
-        let plaintext = decrypt(&password, &self.sec_key, &self.nonce, debug)?;
-        let sec_key = SecretKey::from_slice(&plaintext)?;
-        self.sec_key = encrypt(&password, &plaintext, &mut self.nonce, debug)?;
+        // This could totally blow up if the sizes don't line up
+        let plaintext = decrypt(&password, &self.filedata.ciphertext, &self.filedata.nonce, self.filedata.debug)?
+            .try_into().unwrap();
+        let mnemonic = Mnemonic::from_entropy(plaintext, Language::English);
+
+        self.filedata.ciphertext = encrypt(&password, &self.filedata.ciphertext, &mut self.filedata.nonce, self.filedata.debug)?;
         self.write_to_file();
-        Ok(sec_key)
+        Ok(mnemonic)
     }
 
-    pub fn get_pub_key(&self) -> Result<PublicKey> {
-        Ok(PublicKey::from_str(&self.pub_key)?)
+    pub fn receive(&mut self) -> Result<()> {
+        let addr = match get_network().deref() {
+            "ETH" => ethereum::get_addr(&self)?,
+            _ => bail!("Unsupported network")
+        };
+        println!("Wallet address: {:?}", addr);
+        Ok(())
     }
 
-    // Example of how to encrypt and decrypt
-    pub fn encrypt_decrypt(message: &str) {
-        let key = Key::from_slice(b"an example very very secret key."); // this has to be 256 bits
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(b"unique nonce");
+    // TODO need to generalize this more so it works with any connection
+    pub async fn print_balances(&self, conn: &Web3<WebSocket>) -> Result<()> {
+        // Print out the wallet balance
+        let balance = ethereum::get_balance_eth(&self, &conn).await?;
+        println!("Wallet balance: {} ETH", &balance);
 
-        if let Ok(ciphertext) = cipher.encrypt(nonce, message.as_bytes()) {
-            // If encryption failed that's ok, it's still encrypted on-disk. Is this a problem?
-            if let Ok(plaintext) = cipher.decrypt(nonce, ciphertext.as_ref()) {
-                println!("{:?} {:?}", &plaintext, message.as_bytes());
-                assert_eq!(&plaintext, message.as_bytes());
-            }
+        Ok(())
+    }
+
+    // TODO same here
+    pub async fn send(&mut self, conn: &Web3<WebSocket>) -> Result<()> {
+        println!("Sending!");
+        match get_network().deref() {
+            "ETH" => ethereum::send(&conn, self).await,
+            _ => bail!("Unsupported network.")
         }
     }
+}
+
+fn get_password() -> Result<String> {
+    let password = rpassword::prompt_password("Wallet password: ")?;
+    std::io::stdout().flush();
+    Ok(password)
+}
+
+// Ask the user what network they are looking to send/receive
+fn get_network() -> String {
+    String::from("ETH")
 }
 
 fn encrypt(password: &str, message: &[u8], nonce: &mut [u8], debug: bool) -> Result<Vec<u8>> {

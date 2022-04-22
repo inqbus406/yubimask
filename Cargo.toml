@@ -13,11 +13,14 @@ argon2 = "0.4.0"
 secp256k1 = {version = "0.20.3", features = ["rand"]}
 web3 = "0.17.0" # Was using 0.18.0 but it didn't work with the version of secp256k1
 tiny-keccak = "1.5.0"
-serde = { version = "1.0", features = ["derive"]}
+serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 anyhow = "1.0"
 rand = "0.5.6" # should we use rand_core instead for OsRng?
+rand_core = {version = "0.6.3", features = ["std"]}
 aes-gcm = "0.9.4"
 rpassword = "6.0.1"
-clap = { version = "3.1.9", features = ["derive"] }
+clap = {version = "3.1.9", features = ["derive"] }
 tokio = {version = "1.17.0", features = ["full"]}
+#tiny-bip39 = "0.8.2"
+bip32 = "0.3.0"

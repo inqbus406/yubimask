@@ -14,6 +14,8 @@ use web3::{transports, Web3};
 use web3::transports::WebSocket;
 use web3::types::{Address, H256, TransactionParameters, U256};
 use anyhow::Result;
+//use bip39::Mnemonic;
+use bip32::{Mnemonic, XPrv};
 use crate::wallet;
 use crate::wallet::Wallet;
 
@@ -22,6 +24,7 @@ const ETH_MAINNET_ENDPOINT: &str = "wss://mainnet.infura.io/ws/v3/465e5058a79344
 const ETH_RINKEBY_ENDPOINT: &str = "wss://rinkeby.infura.io/ws/v3/465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_ID: &str = "465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_SECRET: &str = "adfcf1aac28349c4a67cd80b04287e91"; // Probably shouldn't have this in plaintext...
+const NETWORK_NAME: &str = "ETH";
 
 pub fn gen_keypair() -> (SecretKey, PublicKey) {
     let secp = secp256k1::Secp256k1::new();
@@ -59,9 +62,34 @@ pub async fn connect() -> Result<Web3<WebSocket>> {
     Ok(Web3::new(conn))
 }
 
+pub fn get_addr(wallet: &Wallet) -> Result<Address> {
+    todo!();
+}
+
+pub fn get_pub_key(mnemonic: &Mnemonic) -> Result<PublicKey> {
+    todo!();
+    // Derive a BIP39 seed value using the given password
+    let seed = mnemonic.to_seed(""); // Not using a password for now
+
+    // Derive the root `XPrv` from the `seed` value
+    let root_xprv = XPrv::new(&seed)?;
+    assert_eq!(root_xprv, XPrv::derive_from_path(&seed, &"m".parse()?)?);
+
+    // Derive a child `XPrv` using the provided BIP32 derivation path
+    let child_path = "m/0/2147483647'/1/2147483646'";
+    let child_xprv = XPrv::derive_from_path(&seed, &child_path.parse()?)?;
+
+    // Get the `XPub` associated with `child_xprv`.
+    let child_xpub = child_xprv.public_key();
+}
+
+fn get_sec_key(mnemonic: &Mnemonic) -> Result<SecretKey> {
+    todo!();
+}
+
 // Returns the balance in wei
 pub async fn get_balance(wallet: &Wallet, conn: &Web3<WebSocket>) -> Result<U256> {
-    let addr = Address::from_str(&wallet.addr)?;
+    let addr = Address::from_str(&wallet.addrs.get(NETWORK_NAME).unwrap())?;
     Ok(conn.eth().balance(addr, None).await?)
 }
 
@@ -83,7 +111,7 @@ pub async fn sign_and_send(conn: &Web3<WebSocket>, txn: TransactionParameters, s
     Ok(result)
 }
 
-pub async fn send(conn: &Web3<WebSocket>, sec_key: &SecretKey) -> Result<()> {
+pub async fn send(conn: &Web3<WebSocket>, wallet: &mut Wallet) -> Result<()> {
     println!("Sending ETH...");
     let mut input = String::new();
     let to_addr;
@@ -119,11 +147,16 @@ pub async fn send(conn: &Web3<WebSocket>, sec_key: &SecretKey) -> Result<()> {
     //let amount = 0.001;
     let txn = wallet::ethereum::create_txn(to_addr, amount);
 
+    let mnemonic = wallet.get_mnemonic()?;
+    let sec_key = get_sec_key(&mnemonic)?;
+
     let txn_hash = wallet::ethereum::sign_and_send(&conn, txn, &sec_key).await?;
     println!("Transaction hash: {:?}", txn_hash);
 
     Ok(())
 }
+
+// UTILITY FUNCTIONS
 
 pub fn wei_to_eth(wei: U256) -> f64 {
     // We're losing some precision here
