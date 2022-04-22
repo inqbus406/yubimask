@@ -179,6 +179,7 @@ pub fn get_yk_response(challenge: &[u8]) -> Result<Vec<u8>> {
         //let challenge = String::from("mychallenge");
 
         // FIXME handle the case where this fails
+        println!("Please touch your Yubikey...");
         let hmac_result = yubi.challenge_response_hmac(challenge, config).unwrap();
 
         let hexval = hmac_result.deref();
@@ -209,6 +210,7 @@ pub fn program_keys() -> Result<()> {
         // Let's make sure this key isn't already programmed...
         if is_programmed() {
             print!("This key is already programmed, are you sure you want to overwrite? (y/n) ");
+            io::stdout().flush();
             io::stdin().read_line(&mut cont);
             if !cont.to_lowercase().contains('y') {
                 continue
