@@ -143,14 +143,14 @@ struct Args {
     create: bool,
 
     /// Wallet name
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "wallet.ym")]
     name: String,
 
     /// Start GUI
     #[clap(short, long)]
     vis: bool,
 
-    /// Send (default 0.001 ETH)
+    /// Send
     #[clap(short, long)]
     send: bool,
 
