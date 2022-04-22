@@ -236,6 +236,8 @@ pub fn program_keys() -> Result<()> {
                 println!("Successfully programmed!")
             }
             print!("Program another? (y/n) ");
+            io::stdout().flush();
+            cont.clear();
             io::stdin().read_line(&mut cont);
 
         } else {
