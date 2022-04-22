@@ -21,6 +21,10 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     // For testing if yubikey chal/resp works on Windows
+    match wallet::is_programmed() {
+        true => println!("Yubikey already programmed"),
+        false => println!("Yubikey not programmed")
+    }
     // println!("{}", wallet::is_programmed());
     // let chal = b"test chal";
     // println!("{:?}", get_yk_response(chal)?);
