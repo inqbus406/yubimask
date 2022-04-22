@@ -206,18 +206,18 @@ pub fn program_keys() -> Result<()> {
         count += 1;
         println!("Configuring key #{}", count);
 
+        // Let's make sure this key isn't already programmed...
+        if is_programmed() {
+            print!("This key is already programmed, are you sure you want to overwrite? (y/n) ");
+            io::stdin().read_line(&mut cont);
+            if !cont.to_lowercase().contains('y') {
+                continue
+            }
+        }
+
         if let Ok(device) = yubi.find_yubikey() {
             println!("Vendor ID: {:?}", device.vendor_id);
             println!("Product ID: {:?}", device.product_id);
-
-            // Let's make sure this key isn't already programmed...
-            if is_programmed() {
-                print!("This key is already programmed, are you sure you want to overwrite? (y/n) ");
-                io::stdin().read_line(&mut cont);
-                if !cont.to_lowercase().contains('y') {
-                    continue
-                }
-            }
 
             let config = Config::default()
                 .set_vendor_id(device.vendor_id)
@@ -253,7 +253,7 @@ pub fn is_programmed() -> bool {
         let config = Config::default()
             .set_vendor_id(device.vendor_id)
             .set_product_id(device.product_id)
-            .set_variable_size(false)
+            .set_variable_size(true)
             .set_mode(Mode::Sha1)
             .set_slot(Slot::Slot2);
 
