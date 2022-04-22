@@ -86,10 +86,19 @@ pub async fn sign_and_send(conn: &Web3<WebSocket>, txn: TransactionParameters, s
 pub async fn send(conn: &Web3<WebSocket>, sec_key: &SecretKey) -> Result<()> {
     println!("Sending ETH...");
     let mut input = String::new();
-    print!("What address would you like to send to? ");
-    std::io::stdout().flush();
-    std::io::stdin().read_line(&mut input);
-    let to_addr = Address::from_str(&input)?;
+    let to_addr;
+    loop {
+        print!("What address would you like to send to? ");
+        std::io::stdout().flush();
+        std::io::stdin().read_line(&mut input);
+        if let Ok(addr) = Address::from_str(&input) {
+            to_addr = addr;
+            break
+        } else {
+            println!("Invalid address, try again.");
+            input.clear();
+        }
+    }
 
     input.clear();
     print!("What amount would you like to send? ");

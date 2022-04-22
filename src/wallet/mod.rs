@@ -156,7 +156,7 @@ fn decrypt(password: &str, ciphertext: &[u8], nonce: &[u8], debug: bool) -> Resu
     let key = Key::from_slice(&key);
     let cipher = Aes256Gcm::new(key);
 
-    println!("decryption key: {:?}", key);
+    //println!("decryption key: {:?}", key);
     match cipher.decrypt(nonce, ciphertext.as_ref()) {
         Ok(plaintext) => Ok(plaintext),
         Err(_) => panic!("Failed to decrypt!")
