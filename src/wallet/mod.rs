@@ -97,12 +97,58 @@ impl Wallet {
             debug
         };
 
-        Self { // Could also say "EthWallet" instead
+        Self { // Could also say Wallet instead
             name: String::from(name),
             mnemonic,
             filedata,
             addrs // For each one, use this macro format!("{:?}", addr) // if we just use to_string() it gets truncated
         }
+    }
+
+    pub fn import(name: &str, seed_phrase: &str, debug: bool) -> Option<Self> {
+        let mnemonic = match Mnemonic::new(seed_phrase, Default::default()) {
+            Ok(m) => m,
+            Err(_) => panic!("Could not import a wallet from this phrase, is it valid?")
+        };
+        let phrase = mnemonic.phrase();
+        println!("Importing wallet from phrase: {}", phrase);
+
+        let mut nonce = [0u8; 12];
+        std::io::stdout().flush();
+        let password = match rpassword::prompt_password("Set new wallet password: ") {
+            Ok(p) => p,
+            Err(_) => panic!("Password is required for wallet creation") // Should probably make this more graceful, re-prompt, etc
+        };
+        match rpassword::prompt_password("Re-enter password: ") {
+            Ok(password2) => if password2 != password {
+                panic!("Passwords don't match!");
+            },
+            Err(_) => panic!("Password must be entered twice!")
+        }
+
+        // FIXME this will panic if it's the wrong size, do it better!
+        let ciphertext = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
+
+        // Compute our public addresses
+        let mut addrs = HashMap::new();
+        for s in NETWORKS {
+            // For now, let's lazy-load the addresses. Might want to add them all here in the future, though
+            // This will also allow us to convert to a Vec<String> later for HD wallets
+            addrs.insert(String::from(s), String::new());
+        }
+
+        let filedata = FileData {
+            ciphertext,
+            nonce: Vec::from(nonce),
+            debug
+        };
+
+        Some(Self { // Could also say "Wallet" instead
+            name: String::from(name),
+            mnemonic,
+            filedata,
+            addrs // For each one, use this macro format!("{:?}", addr) // if we just use to_string() it gets truncated
+        })
     }
 
     pub fn write_to_file(&self) -> Result<()> {
@@ -155,6 +201,13 @@ impl Wallet {
         self.filedata.ciphertext = encrypt(&password, &plaintext, &mut self.filedata.nonce, self.filedata.debug)?;
         self.write_to_file();
         Ok(mnemonic)
+    }
+
+    pub fn show_seed_phrase(&mut self) -> Result<()> {
+        let mnemonic = self.get_mnemonic()?;
+        let seed_phrase = String::from(mnemonic.phrase());
+        println!("Wallet seed/recovery phrase: {}", &seed_phrase);
+        Ok(())
     }
 
     pub fn receive(&mut self) -> Result<()> {
@@ -214,7 +267,7 @@ fn encrypt(password: &str, message: &[u8], nonce: &mut [u8], debug: bool) -> Res
     let key = Key::from_slice(&key);
     let cipher = Aes256Gcm::new(key);
 
-    println!("encryption key: {:?}", key);
+    // println!("encryption key: {:?}", key);
     if let Ok(ciphertext) = cipher.encrypt(nonce, message) {
         Ok(ciphertext)
     } else {

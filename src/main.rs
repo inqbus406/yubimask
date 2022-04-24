@@ -56,7 +56,25 @@ async fn main() -> Result<()> {
             }
         }
 
+        // TODO ask for wallet language here
+
         let wallet = wallet::Wallet::new(&fname, args.debug);
+        wallet.write_to_file()?;
+    } else if args.import {
+        let mut name = String::new();
+        let mut seed_phrase = String::new();
+        print!("What would you like to name this wallet? ");
+        std::io::stdout().flush();
+        std::io::stdin().read_line(&mut name);
+
+        print!("Enter 24-word seed phrase: ");
+        std::io::stdout().flush();
+        std::io::stdin().read_line(&mut seed_phrase);
+
+        // TODO ask for wallet language here
+
+        let wallet = wallet::Wallet::import(name.trim(), seed_phrase.trim(), args.debug)
+            .expect("Couldn't import from this seed phrase, is it valid?");
         wallet.write_to_file()?;
     } else {
         let mut wallet = match wallet::Wallet::read_from_file(&args.name) {
@@ -78,6 +96,7 @@ async fn main() -> Result<()> {
             println!("  2) send");
             println!("  3) receive (get wallet address)");
             println!("  4) exit");
+            println!("  5) show seed phrase");
 
             let mut response = String::new();
             print!("> ");
@@ -88,6 +107,7 @@ async fn main() -> Result<()> {
                 "2" => { wallet.send(&conn).await?; },
                 "3" => { wallet.receive(); },
                 "4" => { break; },
+                "5" => { wallet.show_seed_phrase()? }
                 _ => {}
             };
         }
