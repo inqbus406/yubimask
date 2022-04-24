@@ -16,6 +16,7 @@ use web3::types::{Address, H256, TransactionParameters, U256};
 use anyhow::Result;
 //use bip39::Mnemonic;
 use bip32::{Mnemonic, XPrv};
+use bip32::secp256k1::Secp256k1;
 use crate::wallet;
 use crate::wallet::Wallet;
 
@@ -63,11 +64,10 @@ pub async fn connect() -> Result<Web3<WebSocket>> {
 }
 
 pub fn get_addr(wallet: &Wallet) -> Result<Address> {
-    todo!();
+    Ok(address_from_pubkey(&get_pub_key(&wallet.mnemonic)?))
 }
 
 pub fn get_pub_key(mnemonic: &Mnemonic) -> Result<PublicKey> {
-    todo!();
     // Derive a BIP39 seed value using the given password
     let seed = mnemonic.to_seed(""); // Not using a password for now
 
@@ -81,15 +81,35 @@ pub fn get_pub_key(mnemonic: &Mnemonic) -> Result<PublicKey> {
 
     // Get the `XPub` associated with `child_xprv`.
     let child_xpub = child_xprv.public_key();
+
+    let result = PublicKey::from_slice(&child_xpub.to_bytes())?;
+    Ok(result)
 }
 
 fn get_sec_key(mnemonic: &Mnemonic) -> Result<SecretKey> {
-    todo!();
+    // Derive a BIP39 seed value using the given password
+    let seed = mnemonic.to_seed(""); // Not using a password for now
+
+    // Derive the root `XPrv` from the `seed` value
+    let root_xprv = XPrv::new(&seed)?;
+    assert_eq!(root_xprv, XPrv::derive_from_path(&seed, &"m".parse()?)?);
+
+    // Derive a child `XPrv` using the provided BIP32 derivation path
+    let child_path = "m/0/2147483647'/1/2147483646'";
+    let child_xprv = XPrv::derive_from_path(&seed, &child_path.parse()?)?;
+
+    let result = SecretKey::from_slice(&child_xprv.to_bytes())?;
+    Ok(result)
 }
 
 // Returns the balance in wei
 pub async fn get_balance(wallet: &Wallet, conn: &Web3<WebSocket>) -> Result<U256> {
-    let addr = Address::from_str(&wallet.addrs.get(NETWORK_NAME).unwrap())?;
+    // TODO populate the wallet map of addresses
+    // let addr = Address::from_str(&wallet.addrs.get(NETWORK_NAME).unwrap())?;
+
+    // For now, just calculate the address each time
+    let addr = get_addr(wallet)?;
+
     Ok(conn.eth().balance(addr, None).await?)
 }
 
@@ -143,8 +163,6 @@ pub async fn send(conn: &Web3<WebSocket>, wallet: &mut Wallet) -> Result<()> {
     let amount = amount.unwrap();
     println!("Sending {} ETH", amount);
 
-    //let to_addr = Address::from_str("0x5841eb5ccb285C262AD4d9A4144f63B5358DB54e")?;
-    //let amount = 0.001;
     let txn = wallet::ethereum::create_txn(to_addr, amount);
 
     let mnemonic = wallet.get_mnemonic()?;

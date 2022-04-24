@@ -113,9 +113,9 @@ struct Args {
     #[clap(short, long)]
     vis: bool,
 
-    /// Send (deprecated)
+    /// Import a wallet from a 24-word BIP39 seed phrase.
     #[clap(short, long)]
-    send: bool,
+    import: bool,
 
     /// Debug mode (no yubikey)
     #[clap(short, long)]

@@ -123,6 +123,11 @@ impl Wallet {
         let reader = BufReader::new(file);
         let filedata: FileData = serde_json::from_reader(reader)?;
 
+        // For debugging purposes
+        // let test = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?;
+        // println!("Decrypted data len: {}, data: {:?}", test.len(), &test);
+        // bail!("Can't proceed");
+
         let entropy: [u8; 32] = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?
             .try_into().unwrap();
         let mnemonic = Mnemonic::from_entropy(entropy, Default::default());
@@ -147,7 +152,7 @@ impl Wallet {
             .try_into().unwrap();
         let mnemonic = Mnemonic::from_entropy(plaintext, Language::English);
 
-        self.filedata.ciphertext = encrypt(&password, &self.filedata.ciphertext, &mut self.filedata.nonce, self.filedata.debug)?;
+        self.filedata.ciphertext = encrypt(&password, &plaintext, &mut self.filedata.nonce, self.filedata.debug)?;
         self.write_to_file();
         Ok(mnemonic)
     }
