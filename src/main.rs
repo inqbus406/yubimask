@@ -83,13 +83,6 @@ async fn main() -> Result<()> {
         };
         //println!("Read from file: {:?}", &wallet);
 
-        // Connect to the network
-        let conn = wallet::ethereum::connect().await?;
-
-        // Print out the current block number
-        let block = conn.eth().block_number().await?;
-        println!("Block number: {}", &block);
-
         loop {
             println!("What would you like to do?");
             println!("  1) view balance");
@@ -103,8 +96,8 @@ async fn main() -> Result<()> {
             std::io::stdout().flush();
             std::io::stdin().read_line(&mut response);
             match response.trim().deref() {
-                "1" => { wallet.print_balances(&conn).await?; },
-                "2" => { wallet.send(&conn).await?; },
+                "1" => { wallet.print_balances().await?; },
+                "2" => { wallet.send().await?; },
                 "3" => { wallet.receive(); },
                 "4" => { break; },
                 "5" => { wallet.show_seed_phrase()? }

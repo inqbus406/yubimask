@@ -103,7 +103,13 @@ fn get_sec_key(mnemonic: &Mnemonic) -> Result<SecretKey> {
 }
 
 // Returns the balance in wei
-pub async fn get_balance(wallet: &Wallet, conn: &Web3<WebSocket>) -> Result<U256> {
+pub async fn get_balance(wallet: &Wallet) -> Result<U256> {
+    // Connect to the network
+    let conn = wallet::ethereum::connect().await?;
+    // Print out the current block number
+    let block = conn.eth().block_number().await?;
+    println!("Block number: {}", &block);
+
     // TODO populate the wallet map of addresses
     // let addr = Address::from_str(&wallet.addrs.get(NETWORK_NAME).unwrap())?;
 
@@ -113,8 +119,8 @@ pub async fn get_balance(wallet: &Wallet, conn: &Web3<WebSocket>) -> Result<U256
     Ok(conn.eth().balance(addr, None).await?)
 }
 
-pub async fn get_balance_eth(wallet: &Wallet, conn: &Web3<WebSocket>) -> Result<f64> {
-    Ok(wei_to_eth(get_balance(wallet, conn).await?))
+pub async fn get_balance_eth(wallet: &Wallet) -> Result<f64> {
+    Ok(wei_to_eth(get_balance(wallet).await?))
 }
 
 pub fn create_txn(addr: Address, eth: f64) -> TransactionParameters {
@@ -125,13 +131,19 @@ pub fn create_txn(addr: Address, eth: f64) -> TransactionParameters {
     }
 }
 
-pub async fn sign_and_send(conn: &Web3<WebSocket>, txn: TransactionParameters, sec_key: &SecretKey) -> Result<H256> {
+pub async fn sign_and_send(txn: TransactionParameters, sec_key: &SecretKey) -> Result<H256> {
+    // Connect to the network
+    let conn = wallet::ethereum::connect().await?;
+    // Print out the current block number
+    let block = conn.eth().block_number().await?;
+    println!("Block number: {}", &block);
+
     let txn = conn.accounts().sign_transaction(txn, sec_key).await?;
     let result = conn.eth().send_raw_transaction(txn.raw_transaction).await?;
     Ok(result)
 }
 
-pub async fn send(conn: &Web3<WebSocket>, wallet: &mut Wallet) -> Result<()> {
+pub async fn send(wallet: &mut Wallet) -> Result<()> {
     println!("Sending ETH...");
     let mut input = String::new();
     let to_addr;
@@ -168,7 +180,7 @@ pub async fn send(conn: &Web3<WebSocket>, wallet: &mut Wallet) -> Result<()> {
     let mnemonic = wallet.get_mnemonic()?;
     let sec_key = get_sec_key(&mnemonic)?;
 
-    let txn_hash = wallet::ethereum::sign_and_send(&conn, txn, &sec_key).await?;
+    let txn_hash = wallet::ethereum::sign_and_send(txn, &sec_key).await?;
     println!("Transaction hash: {:?}", txn_hash);
 
     Ok(())

@@ -35,6 +35,24 @@ use bip32::{Mnemonic, Language};
 // The networks we support
 const NETWORKS: [&str; 2] = ["ETH", "BTC"];
 
+// I feel like this enum could be useful down the line, but maybe not?
+enum Network {
+    ETH,
+    BTC
+}
+
+impl FromStr for Network {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().deref() {
+            "0" | "ETH" => Ok(Self::ETH),
+            "1" | "BTC" => Ok(Self::BTC),
+            _ => Err(String::from("Not a valid network."))
+        }
+    }
+}
+
 // TODO probably should store the language of the wallet
 #[derive(Serialize, Deserialize, Debug)]
 struct FileData {
@@ -74,13 +92,6 @@ impl Wallet {
             Err(_) => panic!("Password must be entered twice!")
         }
 
-        // println!("Mnemonic bytes: {}", mnemonic.entropy().len());
-        // let test: [u8; 32] = Vec::from(mnemonic.entropy().as_slice()).try_into().unwrap();
-        // println!("Test value is: {:?}", test);
-        // let test = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
-        // println!("Test value is: {:?}", test);
-
-        // FIXME this will panic if it's the wrong size, do it better!
         let ciphertext = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
 
         // Compute our public addresses
@@ -106,7 +117,7 @@ impl Wallet {
     }
 
     pub fn import(name: &str, seed_phrase: &str, debug: bool) -> Option<Self> {
-        let mnemonic = match Mnemonic::new(seed_phrase, Default::default()) {
+        let mnemonic = match Mnemonic::new(seed_phrase.to_lowercase(), Default::default()) {
             Ok(m) => m,
             Err(_) => panic!("Could not import a wallet from this phrase, is it valid?")
         };
@@ -169,11 +180,6 @@ impl Wallet {
         let reader = BufReader::new(file);
         let filedata: FileData = serde_json::from_reader(reader)?;
 
-        // For debugging purposes
-        // let test = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?;
-        // println!("Decrypted data len: {}, data: {:?}", test.len(), &test);
-        // bail!("Can't proceed");
-
         let entropy: [u8; 32] = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?
             .try_into().unwrap();
         let mnemonic = Mnemonic::from_entropy(entropy, Default::default());
@@ -211,28 +217,26 @@ impl Wallet {
     }
 
     pub fn receive(&mut self) -> Result<()> {
-        let addr = match get_network().deref() {
-            "ETH" => ethereum::get_addr(&self)?,
+        let addr = match get_network() {
+            Network::ETH => ethereum::get_addr(&self)?,
             _ => bail!("Unsupported network")
         };
         println!("Wallet address: {:?}", addr);
         Ok(())
     }
 
-    // TODO need to generalize this more so it works with any connection
-    pub async fn print_balances(&self, conn: &Web3<WebSocket>) -> Result<()> {
+    pub async fn print_balances(&self) -> Result<()> {
         // Print out the wallet balance
-        let balance = ethereum::get_balance_eth(&self, &conn).await?;
+        let balance = ethereum::get_balance_eth(&self).await?;
         println!("Wallet balance: {} ETH", &balance);
 
         Ok(())
     }
 
-    // TODO same here
-    pub async fn send(&mut self, conn: &Web3<WebSocket>) -> Result<()> {
+    pub async fn send(&mut self) -> Result<()> {
         println!("Sending!");
-        match get_network().deref() {
-            "ETH" => ethereum::send(&conn, self).await,
+        match get_network() {
+            Network::ETH => ethereum::send(self).await,
             _ => bail!("Unsupported network.")
         }
     }
@@ -245,8 +249,23 @@ fn get_password() -> Result<String> {
 }
 
 // Ask the user what network they are looking to send/receive
-fn get_network() -> String {
-    String::from("ETH")
+fn get_network() -> Network {
+    let mut network = String::new();
+    println!("What network?");
+    for (i, name) in NETWORKS.iter().enumerate() {
+        println!("{}: {}", i, name);
+    }
+    loop {
+        network.clear();
+        print!("{}", "> ");
+        io::stdout().flush();
+        io::stdin().read_line(&mut network);
+        if let Ok(response) = Network::from_str(network.trim()) {
+            return response;
+        } else {
+            println!("Not recognized, try again");
+        }
+    }
 }
 
 fn encrypt(password: &str, message: &[u8], nonce: &mut [u8], debug: bool) -> Result<Vec<u8>> {
@@ -397,10 +416,9 @@ pub fn is_programmed() -> bool {
             .set_slot(Slot::Slot2);
 
         println!("Please touch your Yubikey...");
-        if let Ok(_) = yubi.challenge_response_hmac(&[0], config) {
-            true
-        } else {
-            false
+        match yubi.challenge_response_hmac(&[0], config) {
+            Ok(_) => true,
+            _ => false
         }
     } else {
         false
