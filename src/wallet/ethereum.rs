@@ -1,7 +1,4 @@
-// A wallet module specifically for the Ethereum network.
-// We might want to make a "wallets" module later to include all
-// networks if we add more.
-// A substantial portion of this code is taken from https://tms-dev-blog.com/build-a-crypto-wallet-using-rust/
+/// A wallet module specifically for the Ethereum network.
 
 use std::io::Write;
 use std::str::FromStr;
@@ -27,6 +24,7 @@ const INFURA_PROJECT_ID: &str = "465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_SECRET: &str = "adfcf1aac28349c4a67cd80b04287e91"; // Probably shouldn't have this in plaintext...
 const NETWORK_NAME: &str = "ETH";
 
+// This is deprecated
 pub fn gen_keypair() -> (SecretKey, PublicKey) {
     let secp = secp256k1::Secp256k1::new();
     let mut rng;
@@ -123,7 +121,7 @@ pub async fn get_balance_eth(wallet: &Wallet) -> Result<f64> {
     Ok(wei_to_eth(get_balance(wallet).await?))
 }
 
-pub fn create_txn(addr: Address, eth: f64) -> TransactionParameters {
+fn create_txn(addr: Address, eth: f64) -> TransactionParameters {
     TransactionParameters {
         to: Some(addr),
         value: eth_to_wei(eth),

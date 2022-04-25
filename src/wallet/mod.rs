@@ -1,7 +1,8 @@
 // A generic wallet to make things work with multiple networks.
 // We'll use this more in the future.
 
-pub mod ethereum;
+pub mod ethereum; // this was only public for testing, can be made private later
+mod bitcoin;
 
 use std::collections::HashMap;
 use std::fs::OpenOptions;
@@ -40,6 +41,12 @@ enum Network {
     ETH,
     BTC
 }
+
+// I feel like it could be useful to have some type of trait with all the networks implementing its
+// methods, but I haven't quite figured out how to store instances, dispatch, etc, elegantly
+// trait Network {
+//
+// }
 
 impl FromStr for Network {
     type Err = String;
@@ -80,7 +87,6 @@ impl Wallet {
         println!("Seed phrase: {}", phrase);
 
         let mut nonce = [0u8; 12];
-        std::io::stdout().flush();
         let password = match rpassword::prompt_password("Set new wallet password: ") {
             Ok(p) => p,
             Err(_) => panic!("Password is required for wallet creation") // Should probably make this more graceful, re-prompt, etc
@@ -125,7 +131,6 @@ impl Wallet {
         println!("Importing wallet from phrase: {}", phrase);
 
         let mut nonce = [0u8; 12];
-        std::io::stdout().flush();
         let password = match rpassword::prompt_password("Set new wallet password: ") {
             Ok(p) => p,
             Err(_) => panic!("Password is required for wallet creation") // Should probably make this more graceful, re-prompt, etc
