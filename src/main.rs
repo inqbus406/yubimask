@@ -1,18 +1,10 @@
 //extern crate core; // What tf is this and where did it come from? Seems to work without it??
 
-use std::env;
 use std::io::Write;
 use std::ops::Deref;
-use std::str::FromStr;
 use anyhow::{bail, Result};
 use clap::Parser;
 use crate::wallet::{get_yk_response, Wallet}; // only for testing
-use secp256k1::{key, SecretKey};
-use web3::transports::WebSocket;
-
-// For ethereum
-use web3::types::Address;
-use web3::Web3;
 
 mod wallet;
 
@@ -49,10 +41,10 @@ async fn main() -> Result<()> {
         if !args.debug {
             let mut response = String::new();
             print!("Would you like to program your keys alike? This only needs to be done once. (y/n) ");
-            std::io::stdout().flush();
-            std::io::stdin().read_line(&mut response);
+            std::io::stdout().flush()?;
+            std::io::stdin().read_line(&mut response)?;
             if response.to_lowercase().contains('y') {
-                wallet::program_keys();
+                wallet::program_keys()?;
             }
         }
 
@@ -64,12 +56,12 @@ async fn main() -> Result<()> {
         let mut name = String::new();
         let mut seed_phrase = String::new();
         print!("What would you like to name this wallet? ");
-        std::io::stdout().flush();
-        std::io::stdin().read_line(&mut name);
+        std::io::stdout().flush()?;
+        std::io::stdin().read_line(&mut name)?;
 
         print!("Enter 24-word seed phrase: ");
-        std::io::stdout().flush();
-        std::io::stdin().read_line(&mut seed_phrase);
+        std::io::stdout().flush()?;
+        std::io::stdin().read_line(&mut seed_phrase)?;
 
         // TODO ask for wallet language here
 
@@ -93,12 +85,12 @@ async fn main() -> Result<()> {
 
             let mut response = String::new();
             print!("> ");
-            std::io::stdout().flush();
-            std::io::stdin().read_line(&mut response);
+            std::io::stdout().flush()?;
+            std::io::stdin().read_line(&mut response)?;
             match response.trim().deref() {
                 "1" => { wallet.print_balances().await?; },
                 "2" => { wallet.send().await?; },
-                "3" => { wallet.receive(); },
+                "3" => { wallet.receive()?; },
                 "4" => { break; },
                 "5" => { wallet.show_seed_phrase()? }
                 _ => {}

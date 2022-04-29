@@ -10,9 +10,7 @@ use std::io;
 use std::io::{BufReader, BufWriter, Write};
 use std::str::FromStr;
 use anyhow::{bail, Result};
-use secp256k1::{PublicKey, SecretKey};
 use serde::{Serialize, Deserialize};
-use web3::types::Address;
 use yubico_manager::Yubico;
 use yubico_manager::config::{Command, Config, Mode, Slot};
 use std::ops::Deref;
@@ -23,9 +21,7 @@ use aes_gcm::aead::{Aead, NewAead};
 use argon2::Argon2;
 use rand::{Rng, RngCore, thread_rng};
 use rand::distributions::Alphanumeric;
-use rand::rngs::{OsRng, EntropyRng};
-use web3::transports::WebSocket;
-use web3::Web3;
+use rand::rngs::{OsRng}; // Could use EntropyRng as a backup
 use yubico_manager::configure::DeviceModeConfig;
 use yubico_manager::hmacmode::HmacKey;
 
@@ -210,7 +206,7 @@ impl Wallet {
         let mnemonic = Mnemonic::from_entropy(plaintext, Language::English);
 
         self.filedata.ciphertext = encrypt(&password, &plaintext, &mut self.filedata.nonce, self.filedata.debug)?;
-        self.write_to_file();
+        self.write_to_file()?;
         Ok(mnemonic)
     }
 
@@ -249,7 +245,7 @@ impl Wallet {
 
 fn get_password() -> Result<String> {
     let password = rpassword::prompt_password("Wallet password: ")?;
-    std::io::stdout().flush();
+    std::io::stdout().flush()?;
     Ok(password)
 }
 
@@ -263,8 +259,12 @@ fn get_network() -> Network {
     loop {
         network.clear();
         print!("{}", "> ");
-        io::stdout().flush();
-        io::stdin().read_line(&mut network);
+        if let Ok(_) = io::stdout().flush() {
+            match io::stdin().read_line(&mut network) {
+                Ok(_) => {},
+                Err(_) => continue
+            }
+        }
         if let Ok(response) = Network::from_str(network.trim()) {
             return response;
         } else {
@@ -285,7 +285,10 @@ fn encrypt(password: &str, message: &[u8], nonce: &mut [u8], debug: bool) -> Res
     };
     composite.extend(password.as_bytes());
     let kdf = Argon2::default(); // set these params manually later!
-    kdf.hash_password_into(&composite, nonce, &mut key);
+    match kdf.hash_password_into(&composite, nonce, &mut key) {
+        Ok(_) => {},
+        Err(_) => return Err(anyhow::Error::msg("Key derivation failed"))
+    }
 
     let nonce = Nonce::from_slice(nonce);
     let key = Key::from_slice(&key);
@@ -308,7 +311,10 @@ fn decrypt(password: &str, ciphertext: &[u8], nonce: &[u8], debug: bool) -> Resu
     };
     composite.extend(password.as_bytes());
     let kdf = Argon2::default();
-    kdf.hash_password_into(&composite, nonce, &mut key);
+    match kdf.hash_password_into(&composite, nonce, &mut key) {
+        Ok(_) => {},
+        Err(_) => return Err(anyhow::Error::msg("Key derivation failed"))
+    }
 
     let nonce = Nonce::from_slice(nonce);
     let key = Key::from_slice(&key);
@@ -368,9 +374,9 @@ pub fn program_keys() -> Result<()> {
         // Let's make sure this key isn't already programmed...
         if is_programmed() {
             print!("This key is already programmed, are you sure you want to overwrite? (y/n) ");
-            io::stdout().flush();
+            io::stdout().flush()?;
             cont.clear();
-            io::stdin().read_line(&mut cont);
+            io::stdin().read_line(&mut cont)?;
             if !cont.to_lowercase().contains('y') {
                 continue
             }
@@ -395,9 +401,9 @@ pub fn program_keys() -> Result<()> {
                 println!("Successfully programmed!");
             }
             print!("Program another? (y/n) ");
-            io::stdout().flush();
+            io::stdout().flush()?;
             cont.clear();
-            io::stdin().read_line(&mut cont);
+            io::stdin().read_line(&mut cont)?;
 
         } else {
             println!("Yubikey not found.");

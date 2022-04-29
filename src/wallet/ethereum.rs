@@ -13,7 +13,6 @@ use web3::types::{Address, H256, TransactionParameters, U256};
 use anyhow::Result;
 //use bip39::Mnemonic;
 use bip32::{Mnemonic, XPrv};
-use bip32::secp256k1::Secp256k1;
 use crate::wallet;
 use crate::wallet::Wallet;
 
@@ -22,7 +21,7 @@ const ETH_MAINNET_ENDPOINT: &str = "wss://mainnet.infura.io/ws/v3/465e5058a79344
 const ETH_RINKEBY_ENDPOINT: &str = "wss://rinkeby.infura.io/ws/v3/465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_ID: &str = "465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_SECRET: &str = "adfcf1aac28349c4a67cd80b04287e91"; // Probably shouldn't have this in plaintext...
-const NETWORK_NAME: &str = "ETH";
+//const NETWORK_NAME: &str = "ETH";
 
 // This is deprecated
 pub fn gen_keypair() -> (SecretKey, PublicKey) {
@@ -147,8 +146,8 @@ pub async fn send(wallet: &mut Wallet) -> Result<()> {
     let to_addr;
     loop {
         print!("What address would you like to send to? ");
-        std::io::stdout().flush();
-        std::io::stdin().read_line(&mut input);
+        std::io::stdout().flush()?;
+        std::io::stdin().read_line(&mut input)?;
         if let Ok(addr) = Address::from_str(&input) {
             to_addr = addr;
             break
@@ -160,15 +159,17 @@ pub async fn send(wallet: &mut Wallet) -> Result<()> {
 
     input.clear();
     print!("What amount would you like to send? ");
-    std::io::stdout().flush();
-    std::io::stdin().read_line(&mut input);
+    std::io::stdout().flush()?;
+    std::io::stdin().read_line(&mut input)?;
     let mut amount = input.trim().parse();
     while let Err(_) = amount {
         print!("Could not parse, try again: ");
-        std::io::stdout().flush();
+        std::io::stdout().flush()?;
         input.clear();
-        std::io::stdin().read_line(&mut input);
-        amount = f64::from_str(&input.trim()); // just doing it different ways for funsies
+        match std::io::stdin().read_line(&mut input) {
+            Ok(_) => amount = f64::from_str(&input.trim()), // just doing it different ways for funsies
+            Err(_) => {}
+        }
     }
     let amount = amount.unwrap();
     println!("Sending {} ETH", amount);
