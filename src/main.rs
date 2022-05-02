@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
 
         // TODO ask for wallet language here
 
-        let wallet = wallet::Wallet::new(&fname, args.debug);
+        let wallet = Wallet::new(&fname, args.debug);
         wallet.write_to_file()?;
     } else if args.import {
         let mut name = String::new();
@@ -65,35 +65,34 @@ async fn main() -> Result<()> {
 
         // TODO ask for wallet language here
 
-        let wallet = wallet::Wallet::import(name.trim(), seed_phrase.trim(), args.debug)
+        let wallet = Wallet::import(name.trim(), seed_phrase.trim(), args.debug)
             .expect("Couldn't import from this seed phrase, is it valid?");
         wallet.write_to_file()?;
     } else {
-        let mut wallet = match wallet::Wallet::read_from_file(&args.name) {
+        let mut wallet = match Wallet::read_from_file(&args.name) {
             Ok(w) => w,
             Err(e) => panic!("File not found! {}", e)
         };
-        //println!("Read from file: {:?}", &wallet);
 
         loop {
             println!("What would you like to do?");
-            println!("  1) view balance");
-            println!("  2) send");
-            println!("  3) receive (get wallet address)");
-            println!("  4) exit");
-            println!("  5) show seed phrase");
+            println!("  view: view balances");
+            println!("  send: send crypto");
+            println!("  receive: get wallet address");
+            println!("  export: show seed phrase");
+            println!("  exit: quit YubiMask");
 
             let mut response = String::new();
             print!("> ");
             std::io::stdout().flush()?;
             std::io::stdin().read_line(&mut response)?;
-            match response.trim().deref() {
-                "1" => { wallet.print_balances().await?; },
-                "2" => { wallet.send().await?; },
-                "3" => { wallet.receive()?; },
-                "4" => { break; },
-                "5" => { wallet.show_seed_phrase()? }
-                _ => {}
+            match response.trim().to_lowercase().deref() {
+                "view" => { wallet.print_balances().await?; },
+                "send" => { wallet.send().await?; },
+                "receive" => { wallet.receive()?; },
+                "exit" | "quit" => { break; },
+                "export" => { wallet.show_seed_phrase()? }
+                _ => { println!("Unrecognized command") }
             };
         }
     }

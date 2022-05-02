@@ -21,7 +21,7 @@ const ETH_MAINNET_ENDPOINT: &str = "wss://mainnet.infura.io/ws/v3/465e5058a79344
 const ETH_RINKEBY_ENDPOINT: &str = "wss://rinkeby.infura.io/ws/v3/465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_ID: &str = "465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_SECRET: &str = "adfcf1aac28349c4a67cd80b04287e91"; // Probably shouldn't have this in plaintext...
-//const NETWORK_NAME: &str = "ETH";
+const NETWORK_NAME: &str = "ETH";
 
 // This is deprecated
 pub fn gen_keypair() -> (SecretKey, PublicKey) {
@@ -44,7 +44,7 @@ pub fn gen_keypair() -> (SecretKey, PublicKey) {
     secp.generate_keypair(&mut rng)
 }
 
-pub fn address_from_pubkey(pub_key: &PublicKey) -> Address {
+fn address_from_pubkey(pub_key: &PublicKey) -> Address {
     let pub_key = pub_key.serialize_uncompressed();
 
     debug_assert_eq!(pub_key[0], 0x04);
@@ -56,12 +56,18 @@ pub fn address_from_pubkey(pub_key: &PublicKey) -> Address {
 
 pub async fn connect() -> Result<Web3<WebSocket>> {
     let url = ETH_RINKEBY_ENDPOINT;
-    let conn = transports::WebSocket::new(url).await?;
+    let conn = WebSocket::new(url).await?;
     Ok(Web3::new(conn))
 }
 
-pub fn get_addr(wallet: &Wallet) -> Result<Address> {
-    Ok(address_from_pubkey(&get_pub_key(&wallet.mnemonic)?))
+pub fn get_addr(wallet: &mut Wallet) -> Result<Address> {
+    if let Some(addr) = wallet.addrs.get(NETWORK_NAME) {
+        Ok(Address::from_str(addr).unwrap())
+    } else {
+        let addr = address_from_pubkey(&get_pub_key(&wallet.get_mnemonic()?)?);
+        wallet.addrs.insert(String::from(NETWORK_NAME), format!("{:?}", addr)); // to_string truncates the address
+        Ok(addr)
+    }
 }
 
 pub fn get_pub_key(mnemonic: &Mnemonic) -> Result<PublicKey> {
@@ -100,23 +106,19 @@ fn get_sec_key(mnemonic: &Mnemonic) -> Result<SecretKey> {
 }
 
 // Returns the balance in wei
-pub async fn get_balance(wallet: &Wallet) -> Result<U256> {
+pub async fn get_balance(wallet: &mut Wallet) -> Result<U256> {
     // Connect to the network
-    let conn = wallet::ethereum::connect().await?;
+    let conn = connect().await?;
     // Print out the current block number
     let block = conn.eth().block_number().await?;
     println!("Block number: {}", &block);
 
-    // TODO populate the wallet map of addresses
-    // let addr = Address::from_str(&wallet.addrs.get(NETWORK_NAME).unwrap())?;
-
-    // For now, just calculate the address each time
-    let addr = get_addr(wallet)?;
+    let addr = get_addr(wallet).expect("No stored address for this network");
 
     Ok(conn.eth().balance(addr, None).await?)
 }
 
-pub async fn get_balance_eth(wallet: &Wallet) -> Result<f64> {
+pub async fn get_balance_eth(wallet: &mut Wallet) -> Result<f64> {
     Ok(wei_to_eth(get_balance(wallet).await?))
 }
 
@@ -130,7 +132,7 @@ fn create_txn(addr: Address, eth: f64) -> TransactionParameters {
 
 pub async fn sign_and_send(txn: TransactionParameters, sec_key: &SecretKey) -> Result<H256> {
     // Connect to the network
-    let conn = wallet::ethereum::connect().await?;
+    let conn = connect().await?;
     // Print out the current block number
     let block = conn.eth().block_number().await?;
     println!("Block number: {}", &block);
@@ -174,12 +176,12 @@ pub async fn send(wallet: &mut Wallet) -> Result<()> {
     let amount = amount.unwrap();
     println!("Sending {} ETH", amount);
 
-    let txn = wallet::ethereum::create_txn(to_addr, amount);
+    let txn = create_txn(to_addr, amount);
 
     let mnemonic = wallet.get_mnemonic()?;
     let sec_key = get_sec_key(&mnemonic)?;
 
-    let txn_hash = wallet::ethereum::sign_and_send(txn, &sec_key).await?;
+    let txn_hash = sign_and_send(txn, &sec_key).await?;
     println!("Transaction hash: {:?}", txn_hash);
 
     Ok(())

@@ -29,6 +29,9 @@ use yubico_manager::hmacmode::HmacKey;
 //use bip39::{Language, Mnemonic, MnemonicType};
 use bip32::{Mnemonic, Language};
 
+// To make storing secrets in memory safer
+use zeroize::Zeroize;
+
 // The networks we support
 const NETWORKS: [&str; 2] = ["ETH", "BTC"];
 
@@ -66,7 +69,6 @@ struct FileData {
 
 pub struct Wallet {
     pub name: String, // wallet/file name
-    mnemonic: Mnemonic,
     pub addrs: HashMap<String, String>,
     filedata: FileData
 }
@@ -112,7 +114,7 @@ impl Wallet {
 
         Self { // Could also say Wallet instead
             name: String::from(name),
-            mnemonic,
+            //mnemonic,
             filedata,
             addrs // For each one, use this macro format!("{:?}", addr) // if we just use to_string() it gets truncated
         }
@@ -157,7 +159,7 @@ impl Wallet {
 
         Some(Self { // Could also say "Wallet" instead
             name: String::from(name),
-            mnemonic,
+            //mnemonic,
             filedata,
             addrs // For each one, use this macro format!("{:?}", addr) // if we just use to_string() it gets truncated
         })
@@ -181,15 +183,15 @@ impl Wallet {
         let reader = BufReader::new(file);
         let filedata: FileData = serde_json::from_reader(reader)?;
 
-        let entropy: [u8; 32] = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?
-            .try_into().unwrap();
-        let mnemonic = Mnemonic::from_entropy(entropy, Default::default());
+        // let entropy: [u8; 32] = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?
+        //     .try_into().unwrap();
+        // let mnemonic = Mnemonic::from_entropy(entropy, Default::default());
 
         let wallet = Wallet {
             name: String::from(path),
             addrs: HashMap::new(),
             filedata,
-            mnemonic
+            //mnemonic
         };
         Ok(wallet)
     }
@@ -219,16 +221,16 @@ impl Wallet {
 
     pub fn receive(&mut self) -> Result<()> {
         let addr = match get_network() {
-            Network::ETH => ethereum::get_addr(&self)?,
+            Network::ETH => ethereum::get_addr(self)?,
             _ => bail!("Unsupported network")
         };
         println!("Wallet address: {:?}", addr);
         Ok(())
     }
 
-    pub async fn print_balances(&self) -> Result<()> {
+    pub async fn print_balances(&mut self) -> Result<()> {
         // Print out the wallet balance
-        let balance = ethereum::get_balance_eth(&self).await?;
+        let balance = ethereum::get_balance_eth(self).await?;
         println!("Wallet balance: {} ETH", &balance);
 
         Ok(())
@@ -245,7 +247,7 @@ impl Wallet {
 
 fn get_password() -> Result<String> {
     let password = rpassword::prompt_password("Wallet password: ")?;
-    std::io::stdout().flush()?;
+    io::stdout().flush()?;
     Ok(password)
 }
 
