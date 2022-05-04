@@ -221,10 +221,11 @@ impl Wallet {
 
     pub fn receive(&mut self) -> Result<()> {
         let addr = match get_network() {
-            Network::ETH => ethereum::get_addr(self)?,
-            _ => bail!("Unsupported network")
+            Network::ETH => format!("{:?}", ethereum::get_addr(self)?),
+            Network::BTC => bitcoin::get_addr(self)?.to_string(),
+            // _ => bail!("Unsupported network")
         };
-        println!("Wallet address: {:?}", addr);
+        println!("Wallet address: {}", addr);
         Ok(())
     }
 

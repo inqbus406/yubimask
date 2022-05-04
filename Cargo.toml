@@ -24,4 +24,5 @@ clap = {version = "3.1.9", features = ["derive"] }
 tokio = {version = "1.17.0", features = ["full"]}
 #tiny-bip39 = "0.8.2"
 bip32 = {version = "0.3.0", features = ["secp256k1-ffi"]}
+bitcoin = "0.28.1"
 zeroize = "1.5.5"

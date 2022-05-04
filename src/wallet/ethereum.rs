@@ -54,7 +54,7 @@ fn address_from_pubkey(pub_key: &PublicKey) -> Address {
     Address::from_slice(&hash[12..])
 }
 
-pub async fn connect() -> Result<Web3<WebSocket>> {
+async fn connect() -> Result<Web3<WebSocket>> {
     let url = ETH_RINKEBY_ENDPOINT;
     let conn = WebSocket::new(url).await?;
     Ok(Web3::new(conn))
@@ -70,7 +70,7 @@ pub fn get_addr(wallet: &mut Wallet) -> Result<Address> {
     }
 }
 
-pub fn get_pub_key(mnemonic: &Mnemonic) -> Result<PublicKey> {
+fn get_pub_key(mnemonic: &Mnemonic) -> Result<PublicKey> {
     // Derive a BIP39 seed value using the given password
     let seed = mnemonic.to_seed(""); // Not using a password for now
 
