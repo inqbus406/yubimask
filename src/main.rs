@@ -1,15 +1,18 @@
 //extern crate core; // What tf is this and where did it come from? Seems to work without it??
-
+#![allow(dead_code)]
+#![allow(unused_imports)]
 use std::io::Write;
 use std::ops::Deref;
 use anyhow::{bail, Result};
 use clap::Parser;
 use crate::wallet::{get_yk_response, Wallet}; // only for testing
+use colored::*;
 
 mod wallet;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    println!("{}", " _     _         _      _                      _     \n| |   | |       | |    (_)                    | |    \n| |___| | _   _ | |__   _  ____   _____   ___ | |  _ \n|_____  || | | ||  _ \\ | ||    \\ (____ | /___)| |_/ )\n _____| || |_| || |_) )| || | | |/ ___ ||___ ||  _ ( \n(_______||____/ |____/ |_||_|_|_|\\_____|(___/ |_| \\_)\n".color("yellow"));
     println!("Welcome to YubiMask!");
     let args = Args::parse();
 
@@ -71,16 +74,18 @@ async fn main() -> Result<()> {
     } else {
         let mut wallet = match Wallet::read_from_file(&args.name) {
             Ok(w) => w,
-            Err(e) => panic!("File not found! {}", e)
+            Err(e) => {
+                println!("{}", "No wallet found! Try creating a wallet with the argument -c.".color("red"));
+                panic!("File not found! {}", e)}
         };
 
         loop {
             println!("What would you like to do?");
-            println!("  view: view balances");
-            println!("  send: send crypto");
-            println!("  receive: get wallet address");
-            println!("  export: show seed phrase");
-            println!("  exit: quit YubiMask");
+            println!("{} {}", "  view: ".green().bold(), "view balances".italic());
+            println!("{} {}", "  send: ".green().bold(), "send crypto".italic());
+            println!("{} {}", "  receive: ".green().bold(), "get wallet address".italic());
+            println!("{} {}", "  export: ".green().bold(), "show seed phrase".italic());
+            println!("{} {}", "  exit: ".green().bold(), "quit YubiMask".italic());
 
             let mut response = String::new();
             print!("> ");
