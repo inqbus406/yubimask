@@ -12,7 +12,11 @@ mod wallet;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("{}", " __   __          _       _   __  __                 _    \n \\ \\ / /  _   _  | |__   (_) |  \\/  |   __ _   ___  | | __\n  \\ V /  | | | | | \'_ \\  | | | |\\/| |  / _` | / __| | |/ /\n   | |   | |_| | | |_) | | | | |  | | | (_| | \\__ \\ |   < \n   |_|    \\__,_| |_.__/  |_| |_|  |_|  \\__,_| |___/ |_|\\_\\\n".color("yellow"));
+    println!("{}", " __   __          _       _   __  __                 _    ".color("yellow"));
+    println!("{}", " \\ \\ / /  _   _  | |__   (_) |  \\/  |   __ _   ___  | | __".color("yellow"));
+    println!("{}", "  \\ V /  | | | | | \'_ \\  | | | |\\/| |  / _` | / __| | |/ /".color("yellow"));
+    println!("{}", "   | |   | |_| | | |_) | | | | |  | | | (_| | \\__ \\ |   < ".color("yellow"));
+    println!("{}", "   |_|    \\__,_| |_.__/  |_| |_|  |_|  \\__,_| |___/ |_|\\_\\\n".color("yellow"));
     println!("Welcome to YubiMask!");
     let args = Args::parse();
 
@@ -79,14 +83,8 @@ async fn main() -> Result<()> {
                 panic!("File not found! {}", e)}
         };
 
+        show_help();
         loop {
-            println!("What would you like to do?");
-            println!("{} {}", "  view: ".green().bold(), "view balances".italic());
-            println!("{} {}", "  send: ".green().bold(), "send crypto".italic());
-            println!("{} {}", "  receive: ".green().bold(), "get wallet address".italic());
-            println!("{} {}", "  export: ".green().bold(), "show seed phrase".italic());
-            println!("{} {}", "  exit: ".green().bold(), "quit YubiMask".italic());
-
             let mut response = String::new();
             print!("> ");
             std::io::stdout().flush()?;
@@ -96,14 +94,25 @@ async fn main() -> Result<()> {
                 "send" => { wallet.send().await?; },
                 "receive" => { wallet.receive()?; },
                 "exit" | "quit" => { break; },
-                "export" => { wallet.show_seed_phrase()? }
-                _ => { println!("Unrecognized command") }
+                "export" => { wallet.show_seed_phrase()? },
+                "help" => { show_help(); },
+                _ => { println!("Unrecognized command! Try \"help\"") }
             };
         }
     }
     //wallet::Wallet::encrypt_decrypt("test_message_string");
 
     Ok(())
+}
+
+fn show_help() {
+    println!("What would you like to do?");
+    println!("{} {}", "  view: ".green().bold(), "view balances".italic());
+    println!("{} {}", "  send: ".green().bold(), "send crypto".italic());
+    println!("{} {}", "  receive: ".green().bold(), "get wallet address".italic());
+    println!("{} {}", "  export: ".green().bold(), "show seed phrase".italic());
+    println!("{} {}", "  help: ".green().bold(), "show this description of commands".italic());
+    println!("{} {}", "  exit: ".green().bold(), "quit YubiMask".italic());
 }
 
 /// A secure cryptocurrency wallet leveraging encryption with hardware second factors.

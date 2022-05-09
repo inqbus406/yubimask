@@ -23,27 +23,6 @@ const INFURA_PROJECT_ID: &str = "465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_SECRET: &str = "adfcf1aac28349c4a67cd80b04287e91"; // Probably shouldn't have this in plaintext...
 const NETWORK_NAME: &str = "ETH";
 
-// This is deprecated
-pub fn gen_keypair() -> (SecretKey, PublicKey) {
-    let secp = secp256k1::Secp256k1::new();
-    let mut rng;
-    let num;
-    // let rand = match OsRng::new() {
-    //     Ok(mut r) => r.next_u64(),
-    //     Err(_) => EntropyRng::new().next_u64()
-    // };
-    if let Ok(mut rand) = OsRng::new() {
-        num = rand.next_u64();
-        println!("Random number: {}", num);
-    } else {
-        let mut rand = EntropyRng::new();
-        num = rand.next_u64();
-        println!("Backup random number: {}", num);
-    }
-    rng = rngs::StdRng::seed_from_u64(num);
-    secp.generate_keypair(&mut rng)
-}
-
 fn address_from_pubkey(pub_key: &PublicKey) -> Address {
     let pub_key = pub_key.serialize_uncompressed();
 
@@ -113,7 +92,7 @@ pub async fn get_balance(wallet: &mut Wallet) -> Result<U256> {
     let block = conn.eth().block_number().await?;
     println!("Block number: {}", &block);
 
-    let addr = get_addr(wallet).expect("No stored address for this network");
+    let addr = get_addr(wallet).expect("Could not compute address");
 
     Ok(conn.eth().balance(addr, None).await?)
 }

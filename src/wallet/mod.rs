@@ -79,10 +79,10 @@ impl Wallet {
         //let mnemonic = Mnemonic::new(MnemonicType::Words24, Language::English); // this was using bip39 crate
 
         let mnemonic = Mnemonic::random(&mut rand_core::OsRng, Default::default());
-        let phrase = mnemonic.phrase();
-        let entropy = mnemonic.entropy();
-        println!("Generating new wallet from entropy: {:?}", entropy);
-        println!("Seed phrase: {}", phrase);
+        // let phrase = mnemonic.phrase();
+        // let entropy = mnemonic.entropy();
+        // println!("Generating new wallet from entropy: {:?}", entropy);
+        // println!("Seed phrase: {}", phrase);
 
         let mut nonce = [0u8; 12];
         let password = match rpassword::prompt_password("Set new wallet password: ") {
@@ -140,7 +140,6 @@ impl Wallet {
             Err(_) => panic!("Password must be entered twice!")
         }
 
-        // FIXME this will panic if it's the wrong size, do it better!
         let ciphertext = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
 
         // Compute our public addresses
@@ -183,10 +182,6 @@ impl Wallet {
         let reader = BufReader::new(file);
         let filedata: FileData = serde_json::from_reader(reader)?;
 
-        // let entropy: [u8; 32] = decrypt(&get_password()?, &filedata.ciphertext, &filedata.nonce, filedata.debug)?
-        //     .try_into().unwrap();
-        // let mnemonic = Mnemonic::from_entropy(entropy, Default::default());
-
         let wallet = Wallet {
             name: String::from(path),
             addrs: HashMap::new(),
@@ -199,10 +194,9 @@ impl Wallet {
     // Every time the secret key is retrieved here, it must be decrypted and then re-encrypted with new
     // salt, nonce, etc
     pub fn get_mnemonic(&mut self) -> Result<Mnemonic> {
-        //println!("Trying to retrieve secret key");
         let password = get_password()?;
 
-        // This could totally blow up if the sizes don't line up
+        // This could totally blow up if the sizes don't line up because the file was corrupted
         let plaintext = decrypt(&password, &self.filedata.ciphertext, &self.filedata.nonce, self.filedata.debug)?
             .try_into().unwrap();
         let mnemonic = Mnemonic::from_entropy(plaintext, Language::English);
@@ -238,7 +232,6 @@ impl Wallet {
     }
 
     pub async fn send(&mut self) -> Result<()> {
-        println!("Sending!");
         match get_network() {
             Network::ETH => ethereum::send(self).await,
             _ => bail!("Unsupported network.")
@@ -261,7 +254,7 @@ fn get_network() -> Network {
     }
     loop {
         network.clear();
-        print!("{}", "> ");
+        print!("> ");
         if let Ok(_) = io::stdout().flush() {
             match io::stdin().read_line(&mut network) {
                 Ok(_) => {},
@@ -333,8 +326,8 @@ fn decrypt(password: &str, ciphertext: &[u8], nonce: &[u8], debug: bool) -> Resu
 pub fn get_yk_response(challenge: &[u8]) -> Result<Vec<u8>> {
     let mut yubi = Yubico::new();
     if let Ok(device) = yubi.find_yubikey() {
-        println!("Vendor ID: {:?}", device.vendor_id);
-        println!("Product ID: {:?}", device.product_id);
+        // println!("Vendor ID: {:?}", device.vendor_id);
+        // println!("Product ID: {:?}", device.product_id);
 
         let config = Config::default()
             .set_vendor_id(device.vendor_id)
@@ -343,7 +336,6 @@ pub fn get_yk_response(challenge: &[u8]) -> Result<Vec<u8>> {
             .set_mode(Mode::Sha1)
             .set_slot(Slot::Slot2);
 
-        //let challenge = String::from("mychallenge");
         // FIXME handle the case where this fails
         println!("Please touch your Yubikey...");
         let hmac_result = yubi.challenge_response_hmac(challenge, config).unwrap();
