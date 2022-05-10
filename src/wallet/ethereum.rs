@@ -13,6 +13,10 @@ use web3::types::{Address, H256, TransactionParameters, U256};
 use anyhow::Result;
 //use bip39::Mnemonic;
 use bip32::{Mnemonic, XPrv};
+use web3::futures::TryFutureExt;
+
+use serde::{Serialize, Deserialize};
+
 use crate::wallet;
 use crate::wallet::Wallet;
 
@@ -99,6 +103,28 @@ pub async fn get_balance(wallet: &mut Wallet) -> Result<U256> {
 
 pub async fn get_balance_eth(wallet: &mut Wallet) -> Result<f64> {
     Ok(wei_to_eth(get_balance(wallet).await?))
+}
+
+pub async fn get_eth_value(eth: f64) -> Result<f64> {
+    #[derive(Serialize, Deserialize)]
+    struct Value {
+        usd: f64
+    }
+    #[derive(Serialize, Deserialize)]
+    struct Currency {
+        ethereum: Value
+    }
+    let base = "https://api.coingecko.com/api/v3/simple/price";
+    let params = [
+        ("ids", "ethereum"),
+        ("vs_currencies", "usd")
+    ];
+    let url = reqwest::Url::parse_with_params(base, &params)?;
+    let response = reqwest::get(url).await?;
+    let text = response.text().await?;
+    // convert to json to parse the value
+    let json: Currency = serde_json::from_str(&text).unwrap();
+    Ok(json.ethereum.usd * eth)
 }
 
 fn create_txn(addr: Address, eth: f64) -> TransactionParameters {

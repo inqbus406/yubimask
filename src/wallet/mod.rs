@@ -227,7 +227,9 @@ impl Wallet {
         // Print out the wallet balance
         let balance = ethereum::get_balance_eth(self).await?;
         println!("Wallet balance: {} ETH", &balance);
-
+        // now get the USD value of the balance
+        let value = ethereum::get_eth_value(balance).await?;
+        println!("Value of balance: ${:.2} USD", &value);
         Ok(())
     }
 
