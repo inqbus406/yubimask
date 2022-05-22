@@ -85,7 +85,7 @@ impl Wallet {
         // println!("Seed phrase: {}", phrase);
 
         let mut nonce = [0u8; 12];
-        let password = match rpassword::prompt_password("Set new wallet password: ") {
+        let mut password = match rpassword::prompt_password("Set new wallet password: ") {
             Ok(p) => p,
             Err(_) => panic!("Password is required for wallet creation") // Should probably make this more graceful, re-prompt, etc
         };
@@ -97,6 +97,7 @@ impl Wallet {
         }
 
         let ciphertext = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
+        password.zeroize();
 
         // Compute our public addresses
         let mut addrs = HashMap::new();
@@ -129,7 +130,7 @@ impl Wallet {
         println!("Importing wallet from phrase: {}", phrase);
 
         let mut nonce = [0u8; 12];
-        let password = match rpassword::prompt_password("Set new wallet password: ") {
+        let mut password = match rpassword::prompt_password("Set new wallet password: ") {
             Ok(p) => p,
             Err(_) => panic!("Password is required for wallet creation") // Should probably make this more graceful, re-prompt, etc
         };
@@ -141,6 +142,7 @@ impl Wallet {
         }
 
         let ciphertext = encrypt(&password, mnemonic.entropy(), &mut nonce, debug).unwrap();
+        password.zeroize();
 
         // Compute our public addresses
         let mut addrs = HashMap::new();
@@ -194,7 +196,7 @@ impl Wallet {
     // Every time the secret key is retrieved here, it must be decrypted and then re-encrypted with new
     // salt, nonce, etc
     pub fn get_mnemonic(&mut self) -> Result<Mnemonic> {
-        let password = get_password()?;
+        let mut password = get_password()?;
 
         // This could totally blow up if the sizes don't line up because the file was corrupted
         let plaintext = decrypt(&password, &self.filedata.ciphertext, &self.filedata.nonce, self.filedata.debug)?
@@ -203,6 +205,7 @@ impl Wallet {
 
         self.filedata.ciphertext = encrypt(&password, &plaintext, &mut self.filedata.nonce, self.filedata.debug)?;
         self.write_to_file()?;
+        password.zeroize();
         Ok(mnemonic)
     }
 

@@ -40,9 +40,6 @@ async fn main() -> Result<()> {
         MainWindow::new().run();
     }
     if args.create {
-        // print!("Wallet name? ");
-        // let mut fname = String::new();
-        // std::io::stdin().read_line(&mut fname);
         let fname = args.name.clone();
 
         if !args.debug {
@@ -100,7 +97,6 @@ async fn main() -> Result<()> {
             };
         }
     }
-    //wallet::Wallet::encrypt_decrypt("test_message_string");
 
     Ok(())
 }
@@ -123,7 +119,7 @@ struct Args {
     #[clap(short, long)]
     create: bool,
 
-    /// Wallet name
+    /// Wallet name (default: wallet.ym)
     #[clap(short, long, default_value = "wallet.ym")]
     name: String,
 
