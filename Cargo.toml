@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 yubico_manager = "0.9.0"
 hex = "0.4.3"
-slint = "0.2.1"
+#slint = "0.2.1" # Removing this dependency for possible security concerns
 argon2 = "0.4.0"
 secp256k1 = {version = "0.20.3", features = ["rand"]}
 web3 = "0.17.0" # Was using 0.18.0 but it didn't work with the version of secp256k1

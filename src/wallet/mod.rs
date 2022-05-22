@@ -21,7 +21,7 @@ use aes_gcm::aead::{Aead, NewAead};
 use argon2::Argon2;
 use rand::{Rng, RngCore, thread_rng};
 use rand::distributions::Alphanumeric;
-use rand::rngs::{OsRng}; // Could use EntropyRng as a backup
+use rand::rngs::{EntropyRng}; // Was using OsRng but switched to EntropyRng for availability from feedback
 use yubico_manager::configure::DeviceModeConfig;
 use yubico_manager::hmacmode::HmacKey;
 
@@ -277,7 +277,8 @@ fn get_network() -> Network {
 fn encrypt(password: &str, message: &[u8], nonce: &mut [u8], debug: bool) -> Result<Vec<u8>> {
     let mut key: [u8; 32] = [0u8; 32];
 
-    let mut rand = OsRng::new()?;
+    // let mut rand = OsRng::new()?;
+    let mut rand = EntropyRng::new();
     rand.fill_bytes(nonce);
 
     let mut composite = match debug {
@@ -317,6 +318,8 @@ fn decrypt(password: &str, ciphertext: &[u8], nonce: &[u8], debug: bool) -> Resu
         Err(_) => return Err(anyhow::Error::msg("Key derivation failed"))
     }
 
+    // Important note: Using AES-GCM here protects us from padding oracle attacks. If we were to switch
+    // to other AES modes like CBC, we should do encrypt-then-MAC to validate messages before decrypting.
     let nonce = Nonce::from_slice(nonce);
     let key = Key::from_slice(&key);
     let cipher = Aes256Gcm::new(key);

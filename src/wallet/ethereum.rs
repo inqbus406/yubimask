@@ -3,21 +3,14 @@
 use std::io::Write;
 use std::str::FromStr;
 use secp256k1::{PublicKey, SecretKey};
-use secp256k1::rand::{rngs, SeedableRng};
 use tiny_keccak::keccak256;
-use rand::RngCore;
-use rand::rngs::{OsRng, EntropyRng}; // May want to use EntropyRing as a fallback
-use web3::{transports, Web3};
+use web3::Web3;
 use web3::transports::WebSocket;
 use web3::types::{Address, H256, TransactionParameters, U256};
 use anyhow::Result;
-//use bip39::Mnemonic;
 use bip32::{Mnemonic, XPrv};
-use web3::futures::TryFutureExt;
-
 use serde::{Serialize, Deserialize};
 
-use crate::wallet;
 use crate::wallet::Wallet;
 
 // For connecting to the ETH network

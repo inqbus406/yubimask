@@ -3,12 +3,12 @@
 use std::str::FromStr;
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{env, process};
+// use std::{env, process};
 use std::io::{Write, BufReader};
 
 use bitcoin::consensus::{encode, Decodable};
 use bitcoin::network::{address, constants, message, message_network};
-use bitcoin::secp256k1;
+// use bitcoin::secp256k1;
 use rand::Rng;
 
 use anyhow::Result;

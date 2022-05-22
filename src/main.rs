@@ -1,6 +1,5 @@
 //extern crate core; // What tf is this and where did it come from? Seems to work without it??
 #![allow(dead_code)]
-#![allow(unused_imports)]
 use std::io::Write;
 use std::ops::Deref;
 use anyhow::{bail, Result};
@@ -36,9 +35,12 @@ async fn main() -> Result<()> {
     //     MainWindow::new().run();
     // }
     // if args.contains(&String::from("--new")) {
-    if args.vis {
-        MainWindow::new().run();
-    }
+
+    // Not pursuing a GUI for the time being
+    // if args.vis {
+    //     MainWindow::new().run();
+    // }
+
     if args.create {
         let fname = args.name.clone();
 
@@ -123,9 +125,9 @@ struct Args {
     #[clap(short, long, default_value = "wallet.ym")]
     name: String,
 
-    /// Start GUI
-    #[clap(short, long)]
-    vis: bool,
+    // /// Start GUI
+    // #[clap(short, long)]
+    // vis: bool,
 
     /// Import a wallet from a 24-word BIP39 seed phrase.
     #[clap(short, long)]
@@ -136,11 +138,14 @@ struct Args {
     debug: bool
 }
 
-slint::slint! {
-    MainWindow := Window {
-        Text {
-            text: "Welcome to YubiMask!";
-            color: green;
-        }
-    }
-}
+// GUI is a stretch goal, and it sounds like slint might not be the best framework to use from a security
+// perspective... RIP
+
+// slint::slint! {
+//     MainWindow := Window {
+//         Text {
+//             text: "Welcome to YubiMask!";
+//             color: green;
+//         }
+//     }
+// }
