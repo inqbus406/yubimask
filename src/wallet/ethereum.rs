@@ -89,9 +89,11 @@ pub async fn get_balance(wallet: &mut Wallet) -> Result<U256> {
     let block = conn.eth().block_number().await?;
     println!("Block number: {}", &block);
 
-    let addr = get_addr(wallet).expect("Could not compute address");
-
-    Ok(conn.eth().balance(addr, None).await?)
+    if let Ok(addr) = get_addr(wallet) {
+        Ok(conn.eth().balance(addr, None).await?)
+    } else {
+        Err(anyhow::Error::msg("Could not compute wallet address"))
+    }
 }
 
 pub async fn get_balance_eth(wallet: &mut Wallet) -> Result<f64> {

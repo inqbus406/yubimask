@@ -124,7 +124,7 @@ impl Wallet {
     pub fn import(name: &str, seed_phrase: &str, debug: bool) -> Option<Self> {
         let mnemonic = match Mnemonic::new(seed_phrase.to_lowercase(), Default::default()) {
             Ok(m) => m,
-            Err(_) => panic!("Could not import a wallet from this phrase, is it valid?")
+            Err(_) => return None
         };
         let phrase = mnemonic.phrase();
         println!("Importing wallet from phrase: {}", phrase);
@@ -196,17 +196,29 @@ impl Wallet {
     // Every time the secret key is retrieved here, it must be decrypted and then re-encrypted with new
     // salt, nonce, etc
     pub fn get_mnemonic(&mut self) -> Result<Mnemonic> {
-        let mut password = get_password()?;
+        for _ in 0..3 {
+            let mut password = match get_password() {
+                Ok(pw) => pw,
+                Err(_) => continue
+            };
 
-        // This could totally blow up if the sizes don't line up because the file was corrupted
-        let plaintext = decrypt(&password, &self.filedata.ciphertext, &self.filedata.nonce, self.filedata.debug)?
-            .try_into().unwrap();
-        let mnemonic = Mnemonic::from_entropy(plaintext, Language::English);
+            // This could totally blow up if the sizes don't line up because the file was corrupted
+            let plaintext = match decrypt(&password, &self.filedata.ciphertext, &self.filedata.nonce, self.filedata.debug) {
+                Ok(data) => data.try_into().unwrap(),
+                Err(_) => {
+                    println!("Incorrect password, try again.");
+                    continue
+                }
+            };
+            let mnemonic = Mnemonic::from_entropy(plaintext, Language::English);
 
-        self.filedata.ciphertext = encrypt(&password, &plaintext, &mut self.filedata.nonce, self.filedata.debug)?;
-        self.write_to_file()?;
-        password.zeroize();
-        Ok(mnemonic)
+            self.filedata.ciphertext = encrypt(&password, &plaintext, &mut self.filedata.nonce, self.filedata.debug)?;
+            self.write_to_file()?;
+            password.zeroize();
+            return Ok(mnemonic)
+        }
+        eprintln!("Failed three password attempts; exiting...");
+        bail!("Failed three password attempts; exiting...")
     }
 
     pub fn show_seed_phrase(&mut self) -> Result<()> {
@@ -229,10 +241,10 @@ impl Wallet {
     pub async fn print_balances(&mut self) -> Result<()> {
         // Print out the wallet balance
         let balance = ethereum::get_balance_eth(self).await?;
-        println!("Wallet balance: {} ETH", &balance);
         // now get the USD value of the balance
         let value = ethereum::get_eth_value(balance).await?;
-        println!("Value of balance: ${:.2} USD", &value);
+        println!("Wallet balance: {} ETH ~ ${:.2} USD", &balance, &value);
+        // println!("Value of balance: ${:.2} USD", &value);
         Ok(())
     }
 
@@ -300,7 +312,7 @@ fn encrypt(password: &str, message: &[u8], nonce: &mut [u8], debug: bool) -> Res
     if let Ok(ciphertext) = cipher.encrypt(nonce, message) {
         Ok(ciphertext)
     } else {
-        panic!("Encryption failed!");
+        bail!("Encryption failed!");
     }
 }
 
@@ -327,7 +339,7 @@ fn decrypt(password: &str, ciphertext: &[u8], nonce: &[u8], debug: bool) -> Resu
     //println!("decryption key: {:?}", key);
     match cipher.decrypt(nonce, ciphertext.as_ref()) {
         Ok(plaintext) => Ok(plaintext),
-        Err(_) => panic!("Failed to decrypt!")
+        Err(_) => Err(anyhow::Error::msg("Decryption failed"))
     }
 }
 
