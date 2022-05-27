@@ -360,10 +360,10 @@ pub fn get_yk_response(challenge: &[u8]) -> Result<Vec<u8>> {
         println!("Please touch your Yubikey...");
         let hmac_result = yubi.challenge_response_hmac(challenge, config).unwrap();
 
-        let hexval = hmac_result.deref();
-        println!("{:?}", hmac_result);
-        let hexstring = hex::encode(hexval);
-        println!("Response: {}", hexstring);
+        // let hexval = hmac_result.deref();
+        // println!("{:?}", hmac_result);
+        // let hexstring = hex::encode(hexval);
+        // println!("Response: {}", hexstring);
 
         Ok(Vec::from(hmac_result.deref()))
     } else {
