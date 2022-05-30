@@ -17,7 +17,6 @@ use crate::wallet::Wallet;
 const ETH_MAINNET_ENDPOINT: &str = "wss://mainnet.infura.io/ws/v3/465e5058a793440bb743994f856841af";
 const ETH_RINKEBY_ENDPOINT: &str = "wss://rinkeby.infura.io/ws/v3/465e5058a793440bb743994f856841af";
 const INFURA_PROJECT_ID: &str = "465e5058a793440bb743994f856841af";
-const INFURA_PROJECT_SECRET: &str = "adfcf1aac28349c4a67cd80b04287e91"; // Probably shouldn't have this in plaintext...
 const NETWORK_NAME: &str = "ETH";
 
 fn address_from_pubkey(pub_key: &PublicKey) -> Address {

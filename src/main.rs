@@ -2,9 +2,10 @@
 #![allow(dead_code)]
 use std::io::Write;
 use std::ops::Deref;
-use anyhow::{bail, Result};
+use anyhow::{Result};
 use clap::Parser;
-use crate::wallet::{get_yk_response, Wallet}; // only for testing
+// use crate::wallet::{get_yk_response}; // only for testing
+use crate::wallet::Wallet;
 use colored::*;
 
 mod wallet;

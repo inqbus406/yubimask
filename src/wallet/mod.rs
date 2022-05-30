@@ -212,6 +212,7 @@ impl Wallet {
             };
             let mnemonic = Mnemonic::from_entropy(plaintext, Language::English);
 
+            println!("Re-Encrypting...");
             self.filedata.ciphertext = encrypt(&password, &plaintext, &mut self.filedata.nonce, self.filedata.debug)?;
             self.write_to_file()?;
             password.zeroize();
