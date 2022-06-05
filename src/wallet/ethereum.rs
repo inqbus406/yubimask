@@ -1,4 +1,4 @@
-/// A wallet module specifically for the Ethereum network.
+/// A wallet module implementing functionality for the Ethereum network.
 
 use std::io::Write;
 use std::str::FromStr;

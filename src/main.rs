@@ -1,4 +1,3 @@
-//extern crate core; // What tf is this and where did it come from? Seems to work without it??
 #![allow(dead_code)]
 use std::io::Write;
 use std::ops::Deref;
@@ -19,28 +18,6 @@ async fn main() -> Result<()> {
     println!("{}", "   |_|    \\__,_| |_.__/  |_| |_|  |_|  \\__,_| |___/ |_|\\_\\\n".color("yellow"));
     println!("Welcome to YubiMask!");
     let args = Args::parse();
-
-    // For testing if yubikey chal/resp works on Windows
-    // match wallet::is_programmed() {
-    //     true => println!("Yubikey already programmed"),
-    //     false => println!("Yubikey not programmed")
-    // }
-    // println!("{}", wallet::is_programmed());
-    // let chal = b"test chal";
-    // println!("{:?}", get_yk_response(chal)?);
-    // return Ok(());
-
-    // This is ihow I was doing it before I started using clap for parsing
-    // let args: Vec<String> = env::args().skip(1).collect();
-    // if args.contains(&String::from("-v")) {
-    //     MainWindow::new().run();
-    // }
-    // if args.contains(&String::from("--new")) {
-
-    // Not pursuing a GUI for the time being
-    // if args.vis {
-    //     MainWindow::new().run();
-    // }
 
     if args.create {
         let fname = args.name.clone();
@@ -126,10 +103,6 @@ struct Args {
     #[clap(short, long, default_value = "wallet.ym")]
     name: String,
 
-    // /// Start GUI
-    // #[clap(short, long)]
-    // vis: bool,
-
     /// Import a wallet from a 24-word BIP39 seed phrase.
     #[clap(short, long)]
     import: bool,
@@ -138,15 +111,3 @@ struct Args {
     #[clap(short, long)]
     debug: bool
 }
-
-// GUI is a stretch goal, and it sounds like slint might not be the best framework to use from a security
-// perspective... RIP
-
-// slint::slint! {
-//     MainWindow := Window {
-//         Text {
-//             text: "Welcome to YubiMask!";
-//             color: green;
-//         }
-//     }
-// }

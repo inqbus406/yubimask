@@ -1,7 +1,6 @@
-// A generic wallet to make things work with multiple networks.
-// We'll use this more in the future.
+/// A generic wallet to make things work with multiple networks.
 
-pub mod ethereum; // this was only public for testing, can be made private later
+mod ethereum;
 mod bitcoin;
 
 use std::collections::HashMap;
@@ -187,8 +186,7 @@ impl Wallet {
         let wallet = Wallet {
             name: String::from(path),
             addrs: HashMap::new(),
-            filedata,
-            //mnemonic
+            filedata
         };
         Ok(wallet)
     }
